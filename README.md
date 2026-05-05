@@ -104,8 +104,13 @@ the main chart from the fresh corpus.
 The chart shows:
 
 - bars: weekly direct user-message volume
-- line: weekly `swear_index_message_rate`, the percentage of extracted direct user messages that contain at least one counted swear-index term
-- right rail: newest-first dominant model colors with total message counts
+- line: weekly `swear_index_message_rate`, the percentage of extracted direct
+  user messages that contain at least one counted swear-index term
+- right rail: newest-first dominant model families with `Msgs` and `% Swear`
+  columns. `Msgs` is the direct user-message count for that displayed model
+  family in the visible chart window. `% Swear` is that model family's
+  swear-index message rate: swear-index messages for that displayed model
+  family divided by all direct user messages for that displayed model family.
 - top terms: data-backed terms from the actual counted swear-index matches
 
 ## Using The Skill

@@ -9,6 +9,8 @@ from codex_log_tone_audit.audit import (
     DEFAULT_LOGO,
     DEFAULT_SWEAR_LEXICON,
     build_html_period_rows,
+    build_model_legend,
+    chart_model_display_label,
     chart_title,
     compile_patterns,
     diff_new_records,
@@ -116,6 +118,41 @@ class AuditTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["models"][0]["messages"], 10)
         self.assertEqual(rows[0]["models"][0]["swearIndexMessages"], 2)
+
+    def test_model_legend_percent_is_per_model_swear_rate(self):
+        rows = [
+            {
+                "dominantModel": "gpt-5.5 (xhigh)",
+                "models": [
+                    {"label": "gpt-5.5 (xhigh)", "messages": 10, "swearIndexMessages": 2},
+                    {"label": "gpt-5.4 (xhigh)", "messages": 5, "swearIndexMessages": 0},
+                ],
+            },
+            {
+                "dominantModel": "gpt-5.4 (high)",
+                "models": [
+                    {"label": "gpt-5.4 (high)", "messages": 15, "swearIndexMessages": 3},
+                    {"label": "gpt-5.5 (medium)", "messages": 5, "swearIndexMessages": 0},
+                ],
+            },
+        ]
+
+        legend = {row["displayLabel"]: row for row in build_model_legend(rows)}
+
+        self.assertEqual(legend["GPT-5.5"]["messages"], 15)
+        self.assertEqual(legend["GPT-5.5"]["swearIndexMessages"], 2)
+        self.assertEqual(legend["GPT-5.5"]["swearIndexRate"], 0.133333)
+        self.assertEqual(legend["GPT-5.4"]["messages"], 20)
+        self.assertEqual(legend["GPT-5.4"]["swearIndexMessages"], 3)
+        self.assertEqual(legend["GPT-5.4"]["swearIndexRate"], 0.15)
+
+    def test_chart_model_display_label_keeps_unrecognized_models_distinct(self):
+        self.assertEqual(
+            chart_model_display_label("gpt-5.3-codex-spark (xhigh)"),
+            "GPT-5.3 Codex",
+        )
+        self.assertEqual(chart_model_display_label("crest-alpha (xhigh)"), "Crest")
+        self.assertEqual(chart_model_display_label("some-new-model (medium)"), "some-new-model")
 
     def test_model_label(self):
         self.assertEqual(model_label("gpt-5.4", "xhigh"), "gpt-5.4 (xhigh)")

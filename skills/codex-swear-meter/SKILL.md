@@ -83,6 +83,10 @@ The coordinator should merge only terms with current-corpus evidence and should 
 
 - Treat matches as review leads, not a psychological diagnosis.
 - The main chart should use `swear_index_message_rate`: the percentage of extracted direct user messages that contain at least one explicit swear or included narrow frustration phrase.
+- The right-rail `% Swear` column should use the same swear-index definition,
+  but scoped to each displayed model family in the visible chart window:
+  model-family swear-index messages divided by model-family direct user
+  messages. Do not calculate it as model usage share.
 - Keep broader dissatisfaction outputs in CSVs for review, but do not quietly mix them into the visible swear meter.
 - Use `swear_index_excluded_terms` in the spice lexicon for ambiguous terms that should still appear in review outputs but should not count in the chart by themselves.
 - If the dominant model list has `unknown`, explain that the session logs were readable but `state_5.sqlite` lacked model metadata for those threads.

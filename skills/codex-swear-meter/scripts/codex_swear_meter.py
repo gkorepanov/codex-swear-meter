@@ -531,8 +531,8 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
   </main>
 
   <script>
-    const chartStartDate = "__CHART_START_DATE__";
-    const weekly = __WEEKLY_DATA__.filter(row => !row.startDate || row.startDate >= chartStartDate);
+    const weekly = __WEEKLY_DATA__;
+    const modelLegend = __MODEL_LEGEND__;
     const swearExamples = __SWEAR_INDEX_EXAMPLES__;
     const css = getComputedStyle(document.documentElement);
     const colors = {
@@ -574,15 +574,6 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       if (value.includes("5.1")) return "#db2777";
       if (value.includes("crest")) return "#e03743";
       return "#0f9f8f";
-    }
-
-    function shortModel(label) {
-      const value = String(label || "unknown").toLowerCase();
-      if (value === "unknown") return "unknown";
-      const match = value.match(/gpt-(\\d+\\.\\d+)(?:-codex)?/);
-      if (match) return `GPT-${match[1]}${value.includes("codex") ? " Codex" : ""}`;
-      if (value.includes("crest")) return "Crest";
-      return String(label || "other").replace(/ \\([^)]*\\)/, "");
     }
 
     function clamp(value, min, max) {
@@ -831,30 +822,13 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       canvas.addEventListener("blur", hide);
     }
 
-    function renderModelLegend(data) {
-      const byModel = new Map();
-      data.forEach((row, index) => {
-        const label = row.dominantModel || "unknown";
-        const color = modelColor(label);
-        if (!byModel.has(color)) byModel.set(color, { label, color, first: index, last: index, messages: 0, swearIndexMessages: 0 });
-        else byModel.get(color).last = index;
-      });
-      data.forEach(row => {
-        (row.models || []).forEach(model => {
-          const modelColorKey = modelColor(model.label || "unknown");
-          if (!byModel.has(modelColorKey)) return;
-          const current = byModel.get(modelColorKey);
-          current.messages += Number(model.messages || 0);
-          current.swearIndexMessages += Number(model.swearIndexMessages || 0);
-        });
-      });
-      const models = Array.from(byModel.values()).sort((a, b) => b.last - a.last);
+    function renderModelLegend(models) {
       document.getElementById("modelLegend").innerHTML = models.map(model => `
-        <li aria-label="${escapeHTML(`${shortModel(model.label)}: ${model.messages.toLocaleString()} messages, ${pct(model.messages ? model.swearIndexMessages / model.messages : 0)} swear index`)}">
-          <i class="dot-key" title="${escapeHTML(shortModel(model.label))}" style="background: ${model.color}"></i>
-          <span class="model-name">${escapeHTML(shortModel(model.label))}</span>
+        <li aria-label="${escapeHTML(`${model.displayLabel}: ${model.messages.toLocaleString()} messages, ${pct(model.swearIndexRate)} swear index`)}">
+          <i class="dot-key" title="${escapeHTML(model.displayLabel)}" style="background: ${modelColor(model.colorLabel || model.displayLabel)}"></i>
+          <span class="model-name">${escapeHTML(model.displayLabel)}</span>
           <span class="model-count">${model.messages.toLocaleString()}</span>
-          <span class="model-rate">${pct(model.messages ? model.swearIndexMessages / model.messages : 0)}</span>
+          <span class="model-rate">${pct(model.swearIndexRate)}</span>
         </li>
       `).join("");
     }
@@ -878,7 +852,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       drawChart(weeklyCanvas, weekly);
     }
 
-    renderModelLegend(weekly);
+    renderModelLegend(modelLegend);
     renderExamples(swearExamples);
     bindTooltip(weeklyCanvas, weeklyTooltip);
     renderChart();
@@ -2255,7 +2229,16 @@ def write_spice_timeline_html(
     spice_lexicon: dict[str, Any],
     owner_name: str | None,
 ) -> None:
-    weekly = build_html_period_rows(weekly_spice, weekly_models, weekly_model_swear_index)
+    weekly = [
+        row
+        for row in build_html_period_rows(
+            weekly_spice,
+            weekly_models,
+            weekly_model_swear_index,
+        )
+        if not row["startDate"] or row["startDate"] >= HTML_CHART_START_DATE.isoformat()
+    ]
+    model_legend = build_model_legend(weekly)
     examples = top_swear_index_examples(
         spice_term_messages,
         spice_term_occurrences,
@@ -2267,8 +2250,8 @@ def write_spice_timeline_html(
         "__CHART_TITLE__": html.escape(title),
         "__CHART_SUBTITLE__": html.escape(CHART_SUBTITLE),
         "__CHART_LOGO_DATA_URI__": html.escape(png_data_uri(DEFAULT_LOGO)),
-        "__CHART_START_DATE__": HTML_CHART_START_DATE.isoformat(),
         "__WEEKLY_DATA__": json_for_script(weekly),
+        "__MODEL_LEGEND__": json_for_script(model_legend),
         "__SWEAR_INDEX_EXAMPLES__": json_for_script(examples),
     }
     rendered = SPICE_TIMELINE_TEMPLATE
@@ -2365,6 +2348,63 @@ def build_html_period_rows(
             }
         )
     return rows
+
+
+def chart_model_display_label(label: str) -> str:
+    raw_label = str(label or "unknown")
+    value = raw_label.lower()
+    if value == "unknown":
+        return "unknown"
+    match = re.search(r"gpt-(\d+\.\d+)(?:-codex)?", value)
+    if match:
+        suffix = " Codex" if "codex" in value else ""
+        return f"GPT-{match.group(1)}{suffix}"
+    if "crest" in value:
+        return "Crest"
+    effort = re.search(r" \([^)]*\)", raw_label)
+    return raw_label.replace(effort.group(0), "") if effort else raw_label
+
+
+def build_model_legend(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build the right-rail legend from visible chart rows.
+
+    Msgs is total direct user messages for the displayed model family.
+    % Swear is swear-index messages for that family divided by that family's
+    direct user messages, not model usage share and not the all-model line rate.
+    """
+    by_display_label: dict[str, dict[str, Any]] = {}
+    for index, row in enumerate(rows):
+        display_label = chart_model_display_label(str(row.get("dominantModel") or "unknown"))
+        if display_label not in by_display_label:
+            by_display_label[display_label] = {
+                "displayLabel": display_label,
+                "colorLabel": row.get("dominantModel") or display_label,
+                "first": index,
+                "last": index,
+                "messages": 0,
+                "swearIndexMessages": 0,
+            }
+        else:
+            by_display_label[display_label]["last"] = index
+
+    for row in rows:
+        for model in row.get("models", []):
+            display_label = chart_model_display_label(str(model.get("label") or "unknown"))
+            if display_label not in by_display_label:
+                continue
+            current = by_display_label[display_label]
+            current["messages"] += int(model.get("messages") or 0)
+            current["swearIndexMessages"] += int(model.get("swearIndexMessages") or 0)
+
+    legend = sorted(by_display_label.values(), key=lambda row: int(row["last"]), reverse=True)
+    for row in legend:
+        row["swearIndexRate"] = rate(
+            int(row["swearIndexMessages"]),
+            int(row["messages"]),
+        )
+        del row["first"]
+        del row["last"]
+    return legend
 
 
 def json_for_script(value: Any) -> str:

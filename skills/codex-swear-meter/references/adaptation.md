@@ -65,7 +65,13 @@ Each reader should return evidence summaries, not raw private snippets: candidat
 - Subtitle should fit on one line when possible and say that the line is a count/share of direct user messages.
 - Bars should show weekly message volume.
 - The line should show `swear_index_message_rate`: the percentage of extracted direct user messages in that week with at least one included swear-index term.
-- The model legend should list dominant models in newest-first order when the goal is a timeline.
+- The model legend should list dominant model families in newest-first order
+  when the goal is a timeline. `Msgs` is the direct user-message count for that
+  displayed model family in the visible chart window. `% Swear` is a
+  per-model-family swear-index rate: swear-index messages for that displayed
+  model family divided by all direct user messages for that displayed model
+  family. It is not model usage share and it is not the all-model weekly line
+  rate.
 - The examples/top-terms section should be generated from the current run after filtering to swear-index groups, excluding `swear_index_excluded_terms`, and requiring nonzero message counts.
 - Do not reuse default lexicon examples as if they were observed examples.
 - Generate the model legend only from the current run's `model_timeline_weekly.csv` or embedded chart data. If `unknown` appears, say model metadata was unavailable rather than inventing labels.
