@@ -670,6 +670,8 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
         ctx.fill();
       });
 
+      drawSwearLabels(ctx, data, { width, height, pad, plotH, maxRate, xStep, mobile });
+
       ctx.fillStyle = colors.muted;
       ctx.font = `${mobile ? 11 : 13}px system-ui, sans-serif`;
       ctx.textAlign = "center";
@@ -684,6 +686,75 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       });
 
       canvas.__chart = { data, pad, plotW, plotH, maxRate, maxTotal, xStep, width, height };
+    }
+
+    function drawSwearLabels(ctx, data, info) {
+      const { width, pad, plotH, maxRate, xStep, mobile } = info;
+      const peak = Math.max(0, ...data.map(row => row.swearIndexRate));
+      const labelCap = mobile ? Math.min(data.length, 9) : data.length;
+      const placed = [];
+      const candidates = data.map((row, index) => {
+        const previous = data[index - 1]?.swearIndexRate ?? row.swearIndexRate;
+        const next = data[index + 1]?.swearIndexRate ?? row.swearIndexRate;
+        const localTurn = (row.swearIndexRate >= previous && row.swearIndexRate >= next)
+          || (row.swearIndexRate <= previous && row.swearIndexRate <= next);
+        let priority = row.swearIndexRate * 100;
+        if (index === data.length - 1) priority += 1000;
+        if (row.swearIndexRate === peak) priority += 900;
+        if (index === 0) priority += 650;
+        if (localTurn) priority += 420;
+        if (!mobile && index % 2 === 0) priority += 80;
+        return { row, index, priority, localTurn };
+      }).sort((a, b) => b.priority - a.priority);
+
+      ctx.save();
+      ctx.font = `800 ${mobile ? 10 : 12}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = mobile ? 3 : 4;
+      ctx.strokeStyle = colors.paper;
+      ctx.fillStyle = colors.signal;
+
+      for (const candidate of candidates) {
+        if (placed.length >= labelCap) break;
+        const { row, index } = candidate;
+        const text = pct(row.swearIndexRate);
+        const x = pad.left + xStep * index;
+        const y = pad.top + plotH - (row.swearIndexRate / maxRate) * plotH;
+        const w = ctx.measureText(text).width + (mobile ? 6 : 8);
+        const h = mobile ? 13 : 15;
+        const preferAbove = row.swearIndexRate >= (data[index - 1]?.swearIndexRate ?? row.swearIndexRate)
+          && row.swearIndexRate >= (data[index + 1]?.swearIndexRate ?? row.swearIndexRate);
+        const offsets = preferAbove
+          ? [-18, 18, -32, 32]
+          : [18, -18, 32, -32];
+        let chosen = null;
+
+        for (const offset of offsets) {
+          const cx = clamp(x, pad.left + w / 2, width - pad.right - w / 2);
+          const cy = clamp(y + offset, pad.top + h / 2 + 2, pad.top + plotH - h / 2 - 2);
+          const box = { x: cx - w / 2, y: cy - h / 2, w, h };
+          if (placed.every(other => !overlaps(box, other, mobile ? 3 : 2))) {
+            chosen = { cx, cy, box };
+            break;
+          }
+        }
+
+        if (!chosen) continue;
+        placed.push(chosen.box);
+        ctx.strokeText(text, chosen.cx, chosen.cy);
+        ctx.fillText(text, chosen.cx, chosen.cy);
+      }
+      ctx.restore();
+    }
+
+    function overlaps(a, b, padding = 0) {
+      return !(
+        a.x + a.w + padding < b.x
+        || b.x + b.w + padding < a.x
+        || a.y + a.h + padding < b.y
+        || b.y + b.h + padding < a.y
+      );
     }
 
     function bindTooltip(canvas, tooltip) {

@@ -230,6 +230,7 @@ class AuditTests(unittest.TestCase):
             self.assertIn("Weekly count and percentage of direct user messages", html)
             self.assertIn('class="chart-logo"', html)
             self.assertIn("data:image/png;base64,", html)
+            self.assertIn("drawSwearLabels", html)
             self.assertEqual(summary["total_user_messages"], 1)
             self.assertEqual(summary["spice"]["swear_index_messages"], 1)
 
