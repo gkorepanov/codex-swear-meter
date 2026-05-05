@@ -31,6 +31,8 @@ from codex_log_tone_audit.audit import (
 class AuditTests(unittest.TestCase):
     def test_skip_scaffold_and_automations(self):
         self.assertTrue(should_skip_message("# AGENTS.md instructions\n..."))
+        self.assertTrue(should_skip_message("<skill>\n<name>active-research-loop</name>"))
+        self.assertTrue(should_skip_message("<turn_aborted>"))
         self.assertTrue(should_skip_message("Automation: Queue Keeper\n..."))
         self.assertFalse(
             should_skip_message("Automation: Queue Keeper\n...", include_automations=True)
@@ -233,6 +235,50 @@ class AuditTests(unittest.TestCase):
             )
             self.assertEqual(len(included), 1)
             self.assertTrue(included[0]["is_subagent"])
+
+    def test_parse_rollout_skips_fallback_scaffold_messages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codex_home = Path(tmp)
+            path = codex_home / "sessions/2026/01/01/rollout-2026-01-01T00-00-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+            path.parent.mkdir(parents=True)
+            lines = [
+                {
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "type": "session_meta",
+                    "payload": {
+                        "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                        "cwd": "/tmp/example",
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "type": "response_item",
+                    "payload": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": "<skill>\n<name>active-research-loop</name>"}],
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:02Z",
+                    "type": "response_item",
+                    "payload": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": "what the hell is this"}],
+                    },
+                },
+            ]
+            path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
+            records = parse_rollout(
+                path,
+                codex_home,
+                {},
+                {},
+                include_subagents=False,
+                include_automations=False,
+            )
+            self.assertEqual([record["message"] for record in records], ["what the hell is this"])
 
     def test_audit_command_runs_end_to_end_on_fixture_logs(self):
         with tempfile.TemporaryDirectory() as tmp:

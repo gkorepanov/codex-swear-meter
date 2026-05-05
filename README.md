@@ -113,6 +113,11 @@ The chart shows:
   family divided by all direct user messages for that displayed model family.
 - top terms: data-backed terms from the actual counted swear-index matches
 
+Model labels come from Codex's local session/thread metadata. If you continue an
+older thread or the local metadata is incomplete, recent messages can still show
+under that thread's recorded model family, or under `unknown`; the extractor does
+not guess a different per-message model from the surrounding text.
+
 ## Using The Skill
 
 This repository includes an installable Codex skill at:

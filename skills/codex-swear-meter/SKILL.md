@@ -87,6 +87,10 @@ The coordinator should merge only terms with current-corpus evidence and should 
   but scoped to each displayed model family in the visible chart window:
   model-family swear-index messages divided by model-family direct user
   messages. Do not calculate it as model usage share.
+- Model labels come from Codex's local session/thread metadata. If a recent
+  message appears under an older model family, inspect `user_messages.jsonl`
+  by `source_path`, `title`, and `model_label`; do not assume it is a subagent
+  unless `is_subagent` is true.
 - Keep broader dissatisfaction outputs in CSVs for review, but do not quietly mix them into the visible swear meter.
 - Use `swear_index_excluded_terms` in the spice lexicon for ambiguous terms that should still appear in review outputs but should not count in the chart by themselves.
 - If the dominant model list has `unknown`, explain that the session logs were readable but `state_5.sqlite` lacked model metadata for those threads.

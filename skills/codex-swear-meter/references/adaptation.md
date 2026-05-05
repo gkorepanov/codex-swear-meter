@@ -72,6 +72,10 @@ Each reader should return evidence summaries, not raw private snippets: candidat
   model family divided by all direct user messages for that displayed model
   family. It is not model usage share and it is not the all-model weekly line
   rate.
+- Model labels are metadata-backed, not inferred from message text. If a user
+  questions recent model counts, audit `source_path`, `title`, `source_kind`,
+  `is_subagent`, and `model_label` for the disputed date range before changing
+  the calculation.
 - The examples/top-terms section should be generated from the current run after filtering to swear-index groups, excluding `swear_index_excluded_terms`, and requiring nonzero message counts.
 - Do not reuse default lexicon examples as if they were observed examples.
 - Generate the model legend only from the current run's `model_timeline_weekly.csv` or embedded chart data. If `unknown` appears, say model metadata was unavailable rather than inventing labels.

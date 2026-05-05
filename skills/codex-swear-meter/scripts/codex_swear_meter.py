@@ -29,6 +29,8 @@ SCAFFOLD_PREFIXES = (
     "<INSTRUCTIONS>",
     "<environment_context>",
     "<permissions instructions>",
+    "<skill>",
+    "<turn_aborted>",
 )
 
 STOPWORDS = {
