@@ -1,12 +1,14 @@
 import json
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from codex_log_tone_audit.audit import (
     DEFAULT_LEXICON,
     DEFAULT_LOGO,
     DEFAULT_SWEAR_LEXICON,
+    build_html_period_rows,
     chart_title,
     compile_patterns,
     diff_new_records,
@@ -104,6 +106,16 @@ class AuditTests(unittest.TestCase):
 
     def test_week_key(self):
         self.assertEqual(week_key("2026-03-11T17:44:49.123Z"), "2026-W11")
+
+    def test_html_period_rows_include_model_swear_index_counts(self):
+        rows = build_html_period_rows(
+            {"2026-W01": Counter({"total_messages": 10, "swear_index_messages": 2})},
+            {"2026-W01": Counter({"gpt-5.5 (xhigh)": 10})},
+            {"2026-W01": Counter({"gpt-5.5 (xhigh)": 2})},
+        )
+
+        self.assertEqual(rows[0]["models"][0]["messages"], 10)
+        self.assertEqual(rows[0]["models"][0]["swearIndexMessages"], 2)
 
     def test_model_label(self):
         self.assertEqual(model_label("gpt-5.4", "xhigh"), "gpt-5.4 (xhigh)")
@@ -230,6 +242,7 @@ class AuditTests(unittest.TestCase):
             self.assertIn("% of Codex user messages containing swearing", html)
             self.assertIn('class="chart-logo"', html)
             self.assertIn("data:image/png;base64,", html)
+            self.assertIn("model-rate", html)
             self.assertIn("drawSwearLabels", html)
             self.assertEqual(summary["total_user_messages"], 1)
             self.assertEqual(summary["spice"]["swear_index_messages"], 1)

@@ -163,8 +163,8 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       padding: 26px;
       overflow: hidden;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 260px;
-      column-gap: 22px;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      column-gap: 24px;
     }
 
     .chart-top {
@@ -269,11 +269,41 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       line-height: 1.3;
     }
 
+    .model-columns,
     .model-list li {
       display: grid;
-      grid-template-columns: 22px minmax(0, 1fr) auto;
+      grid-template-columns: 22px minmax(0, 1fr) 70px 54px;
       align-items: center;
       gap: 10px;
+    }
+
+    .model-columns {
+      margin: -2px 0 7px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .model-columns span {
+      text-align: right;
+    }
+
+    .model-columns span:first-child {
+      grid-column: 3;
+    }
+
+    .model-columns .model-messages-label {
+      color: var(--volume);
+    }
+
+    .model-columns .model-rate-label {
+      color: var(--signal);
+    }
+
+    .model-list li {
       color: var(--ink);
       font-size: 14px;
       font-weight: 800;
@@ -281,10 +311,20 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
     }
 
     .model-count {
-      color: var(--muted);
+      color: var(--volume);
       font-size: 12px;
       font-weight: 800;
       line-height: 1.2;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .model-rate {
+      color: var(--signal);
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1.2;
+      text-align: right;
       white-space: nowrap;
     }
 
@@ -474,6 +514,10 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 
           <div>
             <h2>Dominant Model:</h2>
+            <div class="model-columns" aria-hidden="true">
+              <span class="model-messages-label">Msgs</span>
+              <span class="model-rate-label">% Swear</span>
+            </div>
             <ul class="model-list" id="modelLegend"></ul>
           </div>
 
@@ -792,22 +836,25 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       data.forEach((row, index) => {
         const label = row.dominantModel || "unknown";
         const color = modelColor(label);
-        if (!byModel.has(color)) byModel.set(color, { label, color, first: index, last: index, messages: 0 });
+        if (!byModel.has(color)) byModel.set(color, { label, color, first: index, last: index, messages: 0, swearIndexMessages: 0 });
         else byModel.get(color).last = index;
       });
       data.forEach(row => {
         (row.models || []).forEach(model => {
           const modelColorKey = modelColor(model.label || "unknown");
           if (!byModel.has(modelColorKey)) return;
-          byModel.get(modelColorKey).messages += Number(model.messages || 0);
+          const current = byModel.get(modelColorKey);
+          current.messages += Number(model.messages || 0);
+          current.swearIndexMessages += Number(model.swearIndexMessages || 0);
         });
       });
       const models = Array.from(byModel.values()).sort((a, b) => b.last - a.last);
       document.getElementById("modelLegend").innerHTML = models.map(model => `
-        <li aria-label="${escapeHTML(`${shortModel(model.label)}: ${model.messages.toLocaleString()} messages`)}">
+        <li aria-label="${escapeHTML(`${shortModel(model.label)}: ${model.messages.toLocaleString()} messages, ${pct(model.messages ? model.swearIndexMessages / model.messages : 0)} swear index`)}">
           <i class="dot-key" title="${escapeHTML(shortModel(model.label))}" style="background: ${model.color}"></i>
           <span class="model-name">${escapeHTML(shortModel(model.label))}</span>
-          <span class="model-count">${model.messages.toLocaleString()} msgs</span>
+          <span class="model-count">${model.messages.toLocaleString()}</span>
+          <span class="model-rate">${pct(model.messages ? model.swearIndexMessages / model.messages : 0)}</span>
         </li>
       `).join("");
     }
@@ -1427,6 +1474,7 @@ def analyze_records(
     model_swear_index: Counter[str] = Counter()
     monthly_models: defaultdict[str, Counter[str]] = defaultdict(Counter)
     weekly_models: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    weekly_model_swear_index: defaultdict[str, Counter[str]] = defaultdict(Counter)
     cwd_messages: Counter[str] = Counter()
     thread_messages: Counter[tuple[str, str]] = Counter()
 
@@ -1449,6 +1497,7 @@ def analyze_records(
                 model_swear[current_model] += 1
             if any(is_swear_index_hit(hit, spice_lexicon) for hit in spice_hits):
                 model_swear_index[current_model] += 1
+                weekly_model_swear_index[week][current_model] += 1
             write_spice_record(
                 record,
                 spice_hits,
@@ -1575,6 +1624,7 @@ def analyze_records(
         weekly_spice,
         monthly_models,
         weekly_models,
+        weekly_model_swear_index,
         model_messages,
         model_spicy,
         model_swear,
@@ -2196,6 +2246,7 @@ def write_spice_timeline_html(
     weekly_spice: dict[str, Counter[str]],
     _monthly_models: dict[str, Counter[str]],
     weekly_models: dict[str, Counter[str]],
+    weekly_model_swear_index: dict[str, Counter[str]],
     _model_messages: Counter[str],
     _model_spicy: Counter[str],
     _model_swear: Counter[str],
@@ -2204,7 +2255,7 @@ def write_spice_timeline_html(
     spice_lexicon: dict[str, Any],
     owner_name: str | None,
 ) -> None:
-    weekly = build_html_period_rows(weekly_spice, weekly_models)
+    weekly = build_html_period_rows(weekly_spice, weekly_models, weekly_model_swear_index)
     examples = top_swear_index_examples(
         spice_term_messages,
         spice_term_occurrences,
@@ -2263,6 +2314,7 @@ def top_swear_index_examples(
 def build_html_period_rows(
     spice_periods: dict[str, Counter[str]],
     model_periods: dict[str, Counter[str]],
+    model_swear_index_periods: dict[str, Counter[str]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for period in sorted(spice_periods):
@@ -2282,7 +2334,11 @@ def build_html_period_rows(
                 "monthKey": f"{start_date.year}-{start_date.month:02d}" if start_date else "",
                 "total": total,
                 "models": [
-                    {"label": label or "unknown", "messages": count}
+                    {
+                        "label": label or "unknown",
+                        "messages": count,
+                        "swearIndexMessages": model_swear_index_periods.get(period, Counter())[label],
+                    }
                     for label, count in model_periods.get(period, Counter()).most_common()
                 ],
                 "spicyMessages": spice_counts["spicy_messages"],
