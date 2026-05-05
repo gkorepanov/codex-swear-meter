@@ -5,6 +5,7 @@ from pathlib import Path
 
 from codex_log_tone_audit.audit import (
     DEFAULT_LEXICON,
+    DEFAULT_LOGO,
     DEFAULT_SWEAR_LEXICON,
     chart_title,
     compile_patterns,
@@ -116,6 +117,8 @@ class AuditTests(unittest.TestCase):
     def test_packaged_default_lexicons_exist(self):
         self.assertTrue(DEFAULT_LEXICON.exists())
         self.assertTrue(DEFAULT_SWEAR_LEXICON.exists())
+        self.assertTrue(DEFAULT_LOGO.exists())
+        self.assertLess(DEFAULT_LOGO.stat().st_size, 100_000)
 
     def test_chart_title_personalizes_owner_name(self):
         self.assertEqual(infer_owner_name("peter"), "Peter")
@@ -225,6 +228,8 @@ class AuditTests(unittest.TestCase):
             summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertIn("Alex&#x27;s Codex Swear Meter", html)
             self.assertIn("Weekly count and percentage of direct user messages", html)
+            self.assertIn('class="chart-logo"', html)
+            self.assertIn("data:image/png;base64,", html)
             self.assertEqual(summary["total_user_messages"], 1)
             self.assertEqual(summary["spice"]["swear_index_messages"], 1)
 

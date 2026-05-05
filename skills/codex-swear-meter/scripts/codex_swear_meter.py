@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import hashlib
 import html
@@ -21,6 +22,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 DEFAULT_LEXICON = SKILL_DIR / "assets" / "negative_terms.json"
 DEFAULT_SWEAR_LEXICON = SKILL_DIR / "assets" / "swear_index_terms.json"
+DEFAULT_LOGO = SKILL_DIR / "assets" / "codex-swear-meter-logo.png"
 
 SCAFFOLD_PREFIXES = (
     "# AGENTS.md instructions",
@@ -168,11 +170,27 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
     .chart-top {
       grid-column: 1;
       margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .chart-logo {
+      width: 84px;
+      height: 84px;
+      flex: 0 0 auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .title-copy {
+      min-width: 0;
     }
 
     h1 {
       margin: 0;
-      font-size: 52px;
+      font-size: 50px;
       line-height: 1;
       letter-spacing: 0;
       white-space: nowrap;
@@ -377,6 +395,17 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
         display: block;
       }
 
+      .chart-top {
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .chart-logo {
+        width: 58px;
+        height: 58px;
+        margin-top: 3px;
+      }
+
       .chart-layout {
         display: grid;
         grid-template-columns: 1fr;
@@ -401,7 +430,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       }
 
       h1 {
-        font-size: 34px;
+        font-size: 31px;
         line-height: 1.05;
         white-space: normal;
       }
@@ -421,7 +450,8 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
   <main>
     <section class="chart-card" aria-label="Codex weekly swear-rate chart">
       <div class="chart-top">
-        <div>
+        <img class="chart-logo" src="__CHART_LOGO_DATA_URI__" alt="" aria-hidden="true">
+        <div class="title-copy">
           <h1>__CHART_TITLE__</h1>
           <p class="subtitle">__CHART_SUBTITLE__</p>
         </div>
@@ -2115,6 +2145,7 @@ def write_spice_timeline_html(
     replacements = {
         "__CHART_TITLE__": html.escape(title),
         "__CHART_SUBTITLE__": html.escape(CHART_SUBTITLE),
+        "__CHART_LOGO_DATA_URI__": html.escape(png_data_uri(DEFAULT_LOGO)),
         "__CHART_START_DATE__": HTML_CHART_START_DATE.isoformat(),
         "__WEEKLY_DATA__": json_for_script(weekly),
         "__SWEAR_INDEX_EXAMPLES__": json_for_script(examples),
@@ -2123,6 +2154,10 @@ def write_spice_timeline_html(
     for placeholder, value in replacements.items():
         rendered = rendered.replace(placeholder, value)
     path.write_text(rendered, encoding="utf-8")
+
+
+def png_data_uri(path: Path) -> str:
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
 def top_swear_index_examples(

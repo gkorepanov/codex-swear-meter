@@ -37,7 +37,7 @@ codex-swear-meter = "codex_log_tone_audit.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-codex_log_tone_audit = ["assets/*.json"]
+codex_log_tone_audit = ["assets/*.json", "assets/*.png"]
 
 [tool.ruff]
 line-length = 100
