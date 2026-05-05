@@ -228,7 +228,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       padding-left: 20px;
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 30px;
       min-width: 0;
     }
 
@@ -421,6 +421,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
         grid-row: auto;
         border-left: 0;
         border-top: 1px solid var(--border);
+        gap: 26px;
         padding: 16px 0 0;
       }
 
