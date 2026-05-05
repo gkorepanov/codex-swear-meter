@@ -70,7 +70,7 @@ The chart shows:
 
 - bars: weekly direct user-message volume
 - line: weekly `swear_index_message_rate`, the percentage of extracted direct user messages that contain at least one counted swear-index term
-- right rail: newest-first dominant model colors
+- right rail: newest-first dominant model colors with total message counts
 - top terms: data-backed terms from the actual counted swear-index matches
 
 ## Using The Skill

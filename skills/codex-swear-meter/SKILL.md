@@ -41,7 +41,7 @@ If the local account name is not a good display name, add `--owner-name "Name"` 
    - no label overlap
    - no horizontal overflow
    - title/subtitle fit
-   - dominant-model legend maps colors to names
+   - dominant-model legend maps colors to names and total message counts
    - top terms are data-backed from the user's own counted terms
 
 ## Corpus Reading And Subagents

@@ -252,13 +252,21 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 
     .model-list li {
       display: grid;
-      grid-template-columns: 22px minmax(0, 1fr);
+      grid-template-columns: 22px minmax(0, 1fr) auto;
       align-items: center;
       gap: 10px;
       color: var(--ink);
       font-size: 14px;
       font-weight: 800;
       line-height: 1.2;
+    }
+
+    .model-count {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.2;
+      white-space: nowrap;
     }
 
     .key-list strong,
@@ -680,14 +688,22 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       data.forEach((row, index) => {
         const label = row.dominantModel || "unknown";
         const color = modelColor(label);
-        if (!byModel.has(color)) byModel.set(color, { label, color, first: index, last: index });
+        if (!byModel.has(color)) byModel.set(color, { label, color, first: index, last: index, messages: 0 });
         else byModel.get(color).last = index;
+      });
+      data.forEach(row => {
+        (row.models || []).forEach(model => {
+          const modelColorKey = modelColor(model.label || "unknown");
+          if (!byModel.has(modelColorKey)) return;
+          byModel.get(modelColorKey).messages += Number(model.messages || 0);
+        });
       });
       const models = Array.from(byModel.values()).sort((a, b) => b.last - a.last);
       document.getElementById("modelLegend").innerHTML = models.map(model => `
-        <li aria-label="${escapeHTML(shortModel(model.label))}">
+        <li aria-label="${escapeHTML(`${shortModel(model.label)}: ${model.messages.toLocaleString()} messages`)}">
           <i class="dot-key" title="${escapeHTML(shortModel(model.label))}" style="background: ${model.color}"></i>
           <span class="model-name">${escapeHTML(shortModel(model.label))}</span>
+          <span class="model-count">${model.messages.toLocaleString()} msgs</span>
         </li>
       `).join("");
     }
@@ -2072,6 +2088,10 @@ def build_html_period_rows(
                 "endDate": end_date.isoformat() if end_date else "",
                 "monthKey": f"{start_date.year}-{start_date.month:02d}" if start_date else "",
                 "total": total,
+                "models": [
+                    {"label": label or "unknown", "messages": count}
+                    for label, count in model_periods.get(period, Counter()).most_common()
+                ],
                 "spicyMessages": spice_counts["spicy_messages"],
                 "spicyRate": rate(spice_counts["spicy_messages"], total),
                 "swearIndexMessages": spice_counts["swear_index_messages"],
