@@ -466,8 +466,8 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
           <div>
             <h2>Legend</h2>
             <ul class="key-list">
-              <li><i class="bar-key"></i><span><strong>Message volume</strong><span>Right axis</span></span></li>
-              <li><i class="line-key"></i><span><strong>Swear index</strong><span>Left axis</span></span></li>
+              <li><i class="bar-key"></i><span><strong>Message volume</strong></span></li>
+              <li><i class="line-key"></i><span><strong>Swear index</strong></span></li>
             </ul>
           </div>
 
@@ -601,9 +601,9 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 
       ctx.strokeStyle = colors.grid;
       ctx.lineWidth = 1;
-      ctx.fillStyle = colors.muted;
       ctx.font = `${mobile ? 12 : 14}px system-ui, sans-serif`;
       ctx.textAlign = "left";
+      ctx.fillStyle = colors.signal;
       for (let i = 0; i <= 4; i += 1) {
         const y = pad.top + plotH * i / 4;
         const rateValue = maxRate * (1 - i / 4);
@@ -615,6 +615,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       }
 
       ctx.textAlign = "right";
+      ctx.fillStyle = colors.volume;
       for (let i = 0; i <= 4; i += 1) {
         const y = pad.top + plotH * i / 4;
         const countValue = maxTotal * (1 - i / 4);
