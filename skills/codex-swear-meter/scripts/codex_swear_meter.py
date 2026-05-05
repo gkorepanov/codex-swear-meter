@@ -845,10 +845,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 """
 
 HTML_CHART_START_DATE = date(2025, 12, 29)
-CHART_SUBTITLE = (
-    "Weekly count and percentage of direct user messages containing expletives or "
-    "swear-adjacent frustration"
-)
+CHART_SUBTITLE = "% of Codex user messages containing swearing, based on local Codex session logs"
 SWEAR_INDEX_GROUPS = frozenset(
     {
         "swearing",

@@ -227,7 +227,7 @@ class AuditTests(unittest.TestCase):
             html = (out_dir / "spice-timeline.html").read_text(encoding="utf-8")
             summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertIn("Alex&#x27;s Codex Swear Meter", html)
-            self.assertIn("Weekly count and percentage of direct user messages", html)
+            self.assertIn("% of Codex user messages containing swearing", html)
             self.assertIn('class="chart-logo"', html)
             self.assertIn("data:image/png;base64,", html)
             self.assertIn("drawSwearLabels", html)
