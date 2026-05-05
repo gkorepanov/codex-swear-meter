@@ -9,13 +9,25 @@ description: Audit local Codex conversation logs for user frustration, swearing,
 
 Generate a local, privacy-preserving chart of how often direct user messages in Codex logs contain explicit swears or swear-adjacent frustration. Adapt the lexicon to the current user's language instead of assuming one person's habits generalize. The chart title should personalize to the local account name by default, or use `--owner-name` when the user gives a preferred display name.
 
+## Experience Contract
+
+When a user kicks off this skill, the finished experience should be a personalized version of the same Codex Swear Meter chart:
+
+- same chart structure: title, subtitle, logo, weekly message bars, swear-index line, dominant-model legend, and observed top terms
+- personalized title from the local account name or the user's preferred name
+- model colors and counts generated from that user's current Codex metadata
+- top terms generated from that user's current counted matches, not copied from examples
+- lexicon adapted from that user's own direct messages before the result is treated as final
+
+The bundled lexicons are only a starting point. A serious skill run should inspect the user's extracted corpus, tune copied lexicons to high-precision direct frustration semantics, rerun the audit, and hand back the final HTML path plus a compact summary of what changed.
+
 ## Workflow
 
 1. Choose a project/output folder. For open-source or repeatable work, create a dedicated project folder instead of writing into `$HOME`.
 2. Copy the bundled lexicons before tuning them:
    - `assets/negative_terms.json`
    - `assets/swear_index_terms.json`
-3. Run the bundled script:
+3. Run the bundled script for a first pass:
 
 ```bash
 python3 ~/.codex/skills/codex-swear-meter/scripts/codex_swear_meter.py audit --codex-home ~/.codex --lexicon <project>/config/negative_terms.json --spice-lexicon <project>/config/swear_index_terms.json --out-dir <project>/outputs
@@ -44,17 +56,18 @@ This compares `<project>/outputs/user_messages.jsonl` with the current raw logs,
    - Avoid broad technical words such as `bug`, `issue`, `problem`, `error`, `wrong`, or `failed` unless paired with a stronger emotional phrase.
    - Prefer narrow phrases such as `what the hell`, `this is awful`, `this sucks`, `come on`, `wasting my time`, `this is a mess`, or `made it worse` over generic single-word negativity.
    - Treat reset/operation phrases such as `start again`, `delete this`, `redo`, and `try again` as review leads, not chart-metric terms, unless the same message also contains a stronger frustration phrase.
-7. Re-run the audit after tuning.
+7. Re-run the audit after tuning and use that rerun for the final chart.
 8. Open `outputs/spice-timeline.html` and visually verify desktop and mobile:
    - no label overlap
    - no horizontal overflow
    - title/subtitle fit
    - dominant-model legend maps colors to names and total message counts
    - top terms are data-backed from the user's own counted terms
+9. Final response should include the HTML path, the total direct-user-message count, the swear-index count and percentage, the latest included timestamp, and what was tuned. Do not expose raw snippets unless the user asks.
 
 ## Corpus Reading And Subagents
 
-Use subagents as corpus readers when the corpus is large, the user's slang is unfamiliar, candidate phrases are noisy, or the user asks for a high-confidence reusable tuning pass.
+Use subagents as corpus readers when the corpus is large, the user's slang is unfamiliar, candidate phrases are noisy, or the user asks for a high-confidence reusable tuning pass and explicitly permits subagent work.
 
 Do not enable `--include-subagents` for this. That flag changes the analyzed corpus by including spawned agent prompts; leave it off unless the user explicitly wants subagent prompts counted.
 

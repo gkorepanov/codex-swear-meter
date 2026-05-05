@@ -41,9 +41,13 @@ Keep a short tuning ledger when preparing a reusable artifact: term, action, mat
 5. Remove or narrow terms that mostly match neutral work requests, pasted logs, benchmark labels, or quoted instructions.
 6. Re-run and compare top terms before trusting the chart.
 
+The goal is semantic adaptation, not copying a global swear list. For a new user, look for their own ways of expressing anger, disappointment, disbelief, impatience, or sharp rejection. A phrase can be countable even if it is not literal profanity, but it should be narrow enough that it rarely appears in ordinary debugging or planning.
+
+Do not overfit to one person's habits. If the phrase only appears in the example screenshot or README and not in the current user's corpus, do not present it as an observed top term. If a starter term never appears, it can remain in the default lexicon as future coverage, but it should not be highlighted as part of that user's story.
+
 ## Corpus Reader Subagents
 
-Use reader subagents when the corpus is large, the user's language/slang is unfamiliar, the first-pass terms are noisy, or a one-person pass cannot review enough evidence.
+Use reader subagents when the corpus is large, the user's language/slang is unfamiliar, the first-pass terms are noisy, or a one-person pass cannot review enough evidence and the user explicitly allows subagent work.
 
 Leave `--include-subagents` off by default. It controls whether spawned agent prompts are part of the analyzed user corpus; it is not needed for using subagents as reviewers.
 

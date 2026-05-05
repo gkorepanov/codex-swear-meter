@@ -38,7 +38,28 @@ Do not publish raw CSVs, snippets, or extracted messages unless you explicitly
 intend to share them. Even screenshots can reveal usage patterns, model choices,
 and rough activity volume.
 
-## Quick Start
+## Recommended Codex Experience
+
+The intended open-source experience is the bundled skill, not just the raw
+starter lexicon. Ask Codex:
+
+```text
+Use $codex-swear-meter to audit my local Codex logs, adapt the swear-index terms to my own wording, and generate a personalized weekly swear-meter chart.
+```
+
+Codex should then:
+
+1. run a first local audit against your Codex logs
+2. inspect matched terms, matched-message samples, and candidate phrases
+3. tune copied lexicons to your own high-precision frustration semantics
+4. rerun the audit
+5. return the final `outputs/spice-timeline.html` chart path and compact counts
+
+That produces the same chart shape as the screenshot, but with your name,
+your model mix, your weekly message volume, and top terms observed in your own
+logs.
+
+## CLI Quick Start
 
 From a checkout:
 
@@ -53,10 +74,11 @@ Then open:
 outputs/spice-timeline.html
 ```
 
-The command runs locally against `~/.codex` by default. It may take a little
-while on a large Codex history because it scans raw JSONL session files and then
-builds CSVs plus a static HTML chart. Re-running is safe; files in `outputs/`
-are overwritten.
+The command runs locally against `~/.codex` by default. It uses the starter
+lexicons without semantic adaptation, so treat it as a baseline. It may take a
+little while on a large Codex history because it scans raw JSONL session files
+and then builds CSVs plus a static HTML chart. Re-running is safe; files in
+`outputs/` are overwritten.
 
 Useful options:
 
@@ -97,13 +119,14 @@ skills/codex-swear-meter
 To install it locally:
 
 ```bash
-cp -R skills/codex-swear-meter ~/.codex/skills/codex-swear-meter
+mkdir -p ~/.codex/skills
+rsync -a skills/codex-swear-meter/ ~/.codex/skills/codex-swear-meter/
 ```
 
 Then ask Codex:
 
 ```text
-Use $codex-swear-meter to audit my local Codex logs and generate a weekly swear-meter chart.
+Use $codex-swear-meter to audit my local Codex logs, adapt the swear-index terms to my own wording, and generate a personalized weekly swear-meter chart.
 ```
 
 The skill includes:
@@ -112,6 +135,7 @@ The skill includes:
 - `scripts/codex_swear_meter.py`: standalone standard-library script
 - `assets/negative_terms.json`: broad review lexicon
 - `assets/swear_index_terms.json`: starter swear-index lexicon
+- `assets/codex-swear-meter-logo.png`: compact transparent chart logo
 - `references/adaptation.md`: guidance for tuning the metric to a different user
 
 ## Adapting To A Different User
@@ -140,7 +164,8 @@ starter lexicon keeps them as review leads instead of chart-counting terms.
 Use `swear_index_excluded_terms` for phrases like that: they remain visible in
 local review CSVs but do not inflate the visible index by themselves.
 
-For larger or unfamiliar corpora, split the tuning pass across reader agents:
+For larger or unfamiliar corpora, and only when the user explicitly allows
+subagent work, split the tuning pass across reader agents:
 one precision reader for false positives, one recall reader for missed
 phrase-level frustration, and one chart/skill reader for presentation quality.
 The coordinator should merge only terms with current-corpus evidence.
@@ -189,11 +214,11 @@ python3 ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/c
 If your Python environment does not have `PyYAML`, run the validator from a
 temporary venv with `PyYAML` installed.
 
-## Open-Source Checklist
+## Release Hygiene
 
-Before publishing:
+Before publishing or tagging a release:
 
-- choose and add a license
+- keep the included MIT license unless you intentionally choose another license
 - remove or keep gitignored any private `outputs/`
 - keep only approved screenshots in `docs/`
 - test the skill from a clean checkout
