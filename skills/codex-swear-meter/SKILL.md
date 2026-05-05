@@ -91,6 +91,9 @@ The coordinator should merge only terms with current-corpus evidence and should 
   message appears under an older model family, inspect `user_messages.jsonl`
   by `source_path`, `title`, and `model_label`; do not assume it is a subagent
   unless `is_subagent` is true.
+- The shareable chart should only name public GPT model families. Fold
+  unrecognized or private model labels into `Other`; do not expose internal
+  model codenames in screenshots, README examples, or generated HTML.
 - Keep broader dissatisfaction outputs in CSVs for review, but do not quietly mix them into the visible swear meter.
 - Use `swear_index_excluded_terms` in the spice lexicon for ambiguous terms that should still appear in review outputs but should not count in the chart by themselves.
 - If the dominant model list has `unknown`, explain that the session logs were readable but `state_5.sqlite` lacked model metadata for those threads.

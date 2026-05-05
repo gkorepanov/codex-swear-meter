@@ -116,7 +116,9 @@ The chart shows:
 Model labels come from Codex's local session/thread metadata. If you continue an
 older thread or the local metadata is incomplete, recent messages can still show
 under that thread's recorded model family, or under `unknown`; the extractor does
-not guess a different per-message model from the surrounding text.
+not guess a different per-message model from the surrounding text. The shareable
+chart only names public GPT model families; unrecognized or private model labels
+are folded into `Other`.
 
 ## Using The Skill
 

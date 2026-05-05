@@ -121,6 +121,16 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(rows[0]["models"][0]["messages"], 10)
         self.assertEqual(rows[0]["models"][0]["swearIndexMessages"], 2)
 
+    def test_html_period_rows_fold_non_public_model_labels(self):
+        rows = build_html_period_rows(
+            {"2026-W01": Counter({"total_messages": 10, "swear_index_messages": 3})},
+            {"2026-W01": Counter({"private-alpha (xhigh)": 6, "private-beta (medium)": 4})},
+            {"2026-W01": Counter({"private-alpha (xhigh)": 1, "private-beta (medium)": 2})},
+        )
+
+        self.assertEqual(rows[0]["dominantModel"], "Other")
+        self.assertEqual(rows[0]["models"], [{"label": "Other", "messages": 10, "swearIndexMessages": 3}])
+
     def test_model_legend_percent_is_per_model_swear_rate(self):
         rows = [
             {
@@ -148,13 +158,14 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(legend["GPT-5.4"]["swearIndexMessages"], 3)
         self.assertEqual(legend["GPT-5.4"]["swearIndexRate"], 0.15)
 
-    def test_chart_model_display_label_keeps_unrecognized_models_distinct(self):
+    def test_chart_model_display_label_redacts_unrecognized_models(self):
         self.assertEqual(
             chart_model_display_label("gpt-5.3-codex-spark (xhigh)"),
             "GPT-5.3 Codex",
         )
-        self.assertEqual(chart_model_display_label("crest-alpha (xhigh)"), "Crest")
-        self.assertEqual(chart_model_display_label("some-new-model (medium)"), "some-new-model")
+        self.assertEqual(chart_model_display_label("gpt-5-codex (xhigh)"), "GPT-5 Codex")
+        self.assertEqual(chart_model_display_label("private-alpha (xhigh)"), "Other")
+        self.assertEqual(chart_model_display_label("some-new-model (medium)"), "Other")
 
     def test_model_label(self):
         self.assertEqual(model_label("gpt-5.4", "xhigh"), "gpt-5.4 (xhigh)")

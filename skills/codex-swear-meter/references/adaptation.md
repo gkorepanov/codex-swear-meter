@@ -76,6 +76,9 @@ Each reader should return evidence summaries, not raw private snippets: candidat
   questions recent model counts, audit `source_path`, `title`, `source_kind`,
   `is_subagent`, and `model_label` for the disputed date range before changing
   the calculation.
+- In shareable outputs, name only public GPT model families. Fold unrecognized
+  or private model labels into `Other` so internal codenames never appear in
+  screenshots, README examples, or generated HTML.
 - The examples/top-terms section should be generated from the current run after filtering to swear-index groups, excluding `swear_index_excluded_terms`, and requiring nonzero message counts.
 - Do not reuse default lexicon examples as if they were observed examples.
 - Generate the model legend only from the current run's `model_timeline_weekly.csv` or embedded chart data. If `unknown` appears, say model metadata was unavailable rather than inventing labels.

@@ -569,12 +569,12 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
     function modelColor(label) {
       const value = String(label || "unknown").toLowerCase();
       if (value === "unknown") return "#7b8493";
+      if (value === "other") return "#64748b";
       if (value.includes("5.5")) return "#16a34a";
       if (value.includes("5.4")) return "#2f6fed";
       if (value.includes("5.3")) return "#a855f7";
       if (value.includes("5.2")) return "#f59e0b";
       if (value.includes("5.1")) return "#db2777";
-      if (value.includes("crest")) return "#e03743";
       return "#0f9f8f";
     }
 
@@ -2305,7 +2305,11 @@ def build_html_period_rows(
     for period in sorted(spice_periods):
         spice_counts = spice_periods[period]
         total = spice_counts["total_messages"]
-        top = model_periods.get(period, Counter()).most_common(3)
+        folded_models, folded_model_swear_index = fold_chart_model_counts(
+            model_periods.get(period, Counter()),
+            model_swear_index_periods.get(period, Counter()),
+        )
+        top = folded_models.most_common(3)
         padded = top + [("", 0)] * (3 - len(top))
         date_label, date_range = period_date_text(period)
         start_date, end_date = period_bounds(period)
@@ -2320,11 +2324,11 @@ def build_html_period_rows(
                 "total": total,
                 "models": [
                     {
-                        "label": label or "unknown",
+                        "label": label,
                         "messages": count,
-                        "swearIndexMessages": model_swear_index_periods.get(period, Counter())[label],
+                        "swearIndexMessages": folded_model_swear_index[label],
                     }
-                    for label, count in model_periods.get(period, Counter()).most_common()
+                    for label, count in folded_models.most_common()
                 ],
                 "spicyMessages": spice_counts["spicy_messages"],
                 "spicyRate": rate(spice_counts["spicy_messages"], total),
@@ -2352,19 +2356,29 @@ def build_html_period_rows(
     return rows
 
 
+def fold_chart_model_counts(
+    model_counts: Counter[str],
+    model_swear_index_counts: Counter[str],
+) -> tuple[Counter[str], Counter[str]]:
+    folded_models: Counter[str] = Counter()
+    folded_swear_index: Counter[str] = Counter()
+    for raw_label, count in model_counts.items():
+        display_label = chart_model_display_label(raw_label)
+        folded_models[display_label] += count
+        folded_swear_index[display_label] += model_swear_index_counts[raw_label]
+    return folded_models, folded_swear_index
+
+
 def chart_model_display_label(label: str) -> str:
-    raw_label = str(label or "unknown")
+    raw_label = str(label or "unknown").strip()
     value = raw_label.lower()
-    if value == "unknown":
+    if not raw_label or value == "unknown":
         return "unknown"
-    match = re.search(r"gpt-(\d+\.\d+)(?:-codex)?", value)
+    match = re.search(r"gpt-(\d+(?:\.\d+)?)(?:-codex)?", value)
     if match:
         suffix = " Codex" if "codex" in value else ""
         return f"GPT-{match.group(1)}{suffix}"
-    if "crest" in value:
-        return "Crest"
-    effort = re.search(r" \([^)]*\)", raw_label)
-    return raw_label.replace(effort.group(0), "") if effort else raw_label
+    return "Other"
 
 
 def build_model_legend(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
