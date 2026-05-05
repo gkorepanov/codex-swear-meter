@@ -25,19 +25,27 @@ If the user only wants a quick first pass, omit `--lexicon` and `--spice-lexicon
 
 If the local account name is not a good display name, add `--owner-name "Name"` to make the title `Name's Codex Swear Meter`. Pass an empty owner name only when the user wants the generic `Codex Swear Meter` title.
 
-4. Inspect the first pass:
+4. Before reusing an older chart, check freshness:
+
+```bash
+python3 ~/.codex/skills/codex-swear-meter/scripts/codex_swear_meter.py incremental --out-dir <project>/outputs
+```
+
+This compares `<project>/outputs/user_messages.jsonl` with the current raw logs, writes `<project>/outputs/incremental/new_user_messages.jsonl`, and analyzes only the new messages in `<project>/outputs/incremental/`. If `incremental_status.json` says `needs_refresh: true`, run `audit` again after reviewing the delta.
+
+5. Inspect the first pass:
    - `outputs/spice_term_counts.csv`: actual counted terms
    - `outputs/spice_messages.csv`: matched snippets for review
    - `outputs/candidate_phrases.csv`: phrase candidates from the user's own messages
    - `outputs/model_timeline_weekly.csv`: dominant model by week
-5. Tune the copied swear-index lexicon to the user:
+6. Tune the copied swear-index lexicon to the user:
    - Add phrase-level terms that clearly express their own frustration style.
    - Keep literal swears and swear-adjacent phrases in the chart metric.
    - Avoid broad technical words such as `bug`, `issue`, `problem`, `error`, `wrong`, or `failed` unless paired with a stronger emotional phrase.
    - Prefer narrow phrases such as `what the hell`, `this is awful`, `this sucks`, `come on`, `wasting my time`, `this is a mess`, or `made it worse` over generic single-word negativity.
    - Treat reset/operation phrases such as `start again`, `delete this`, `redo`, and `try again` as review leads, not chart-metric terms, unless the same message also contains a stronger frustration phrase.
-6. Re-run the audit after tuning.
-7. Open `outputs/spice-timeline.html` and visually verify desktop and mobile:
+7. Re-run the audit after tuning.
+8. Open `outputs/spice-timeline.html` and visually verify desktop and mobile:
    - no label overlap
    - no horizontal overflow
    - title/subtitle fit

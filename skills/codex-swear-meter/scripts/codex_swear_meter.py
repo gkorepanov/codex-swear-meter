@@ -10,7 +10,7 @@ import re
 import sqlite3
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -846,6 +846,52 @@ def main(argv: list[str] | None = None) -> None:
         )
         print(f"wrote {len(records):,} user messages to {messages_path}")
         print(f"wrote audit outputs to {out_dir}")
+    elif args.command == "incremental":
+        out_dir = Path(args.out_dir)
+        delta_dir = Path(args.delta_dir) if args.delta_dir else out_dir / "incremental"
+        baseline_messages_path = (
+            Path(args.messages) if args.messages else out_dir / "user_messages.jsonl"
+        )
+        previous_records = (
+            read_jsonl(baseline_messages_path) if baseline_messages_path.exists() else []
+        )
+        current_records = extract_messages(
+            Path(args.codex_home),
+            Path(args.state) if args.state else None,
+            include_subagents=args.include_subagents,
+            include_automations=args.include_automations,
+        )
+        new_records = diff_new_records(current_records, previous_records)
+        delta_messages_path = delta_dir / "new_user_messages.jsonl"
+        write_jsonl(delta_messages_path, new_records)
+        write_incremental_status(
+            delta_dir / "incremental_status.json",
+            previous_records,
+            current_records,
+            new_records,
+            baseline_messages_path,
+            delta_messages_path,
+            delta_dir,
+            analysis_skipped=args.skip_analysis,
+        )
+        if not args.skip_analysis:
+            analyze_records(
+                new_records,
+                Path(args.lexicon),
+                Path(args.spice_lexicon),
+                delta_dir,
+                args.sample_limit,
+                args.owner_name,
+            )
+        else:
+            clear_incremental_analysis_outputs(delta_dir)
+        print(
+            "found "
+            f"{len(new_records):,} new user messages "
+            f"({len(previous_records):,} baseline, {len(current_records):,} current)"
+        )
+        print(f"wrote incremental messages to {delta_messages_path}")
+        print(f"wrote incremental status to {delta_dir / 'incremental_status.json'}")
     else:
         parser.error(f"unknown command: {args.command}")
 
@@ -902,6 +948,47 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include spawned subagent and generic agent-job prompts.",
     )
     audit.add_argument(
+        "--include-automations",
+        action="store_true",
+        help="Include recurring automation prompts.",
+    )
+
+    incremental = subparsers.add_parser(
+        "incremental",
+        help="Review direct user messages that are not present in the last extraction.",
+    )
+    incremental.add_argument("--codex-home", default=str(Path.home() / ".codex"))
+    incremental.add_argument("--state", default=None, help="Optional explicit state_5.sqlite path.")
+    incremental.add_argument(
+        "--messages",
+        default=None,
+        help="Existing extracted JSONL to compare against. Defaults to <out-dir>/user_messages.jsonl.",
+    )
+    incremental.add_argument("--out-dir", default="outputs")
+    incremental.add_argument(
+        "--delta-dir",
+        default=None,
+        help="Directory for delta outputs. Defaults to <out-dir>/incremental.",
+    )
+    incremental.add_argument("--lexicon", default=str(DEFAULT_LEXICON))
+    incremental.add_argument("--spice-lexicon", default=str(DEFAULT_SWEAR_LEXICON))
+    incremental.add_argument("--sample-limit", type=int, default=75)
+    incremental.add_argument(
+        "--owner-name",
+        default=None,
+        help="Optional display name for the delta chart title. Defaults to the local account name.",
+    )
+    incremental.add_argument(
+        "--skip-analysis",
+        action="store_true",
+        help="Only write the delta JSONL and status file.",
+    )
+    incremental.add_argument(
+        "--include-subagents",
+        action="store_true",
+        help="Include spawned subagent and generic agent-job prompts.",
+    )
+    incremental.add_argument(
         "--include-automations",
         action="store_true",
         help="Include recurring automation prompts.",
@@ -2382,6 +2469,99 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def record_comparison_key(record: dict[str, Any]) -> tuple[str, str, str]:
+    message = " ".join(str(record.get("message") or "").split())
+    return (
+        str(record.get("thread_id") or ""),
+        str(record.get("timestamp") or ""),
+        message,
+    )
+
+
+def diff_new_records(
+    current_records: list[dict[str, Any]],
+    previous_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    previous_keys = {record_comparison_key(record) for record in previous_records}
+    return [
+        record
+        for record in current_records
+        if record_comparison_key(record) not in previous_keys
+    ]
+
+
+def timestamp_range(records: list[dict[str, Any]]) -> dict[str, str]:
+    timestamps = [
+        str(record.get("timestamp") or "") for record in records if record.get("timestamp")
+    ]
+    return {
+        "first_timestamp": min(timestamps, default=""),
+        "last_timestamp": max(timestamps, default=""),
+    }
+
+
+def count_messages_on_utc_day(records: list[dict[str, Any]], day: str) -> int:
+    return sum(1 for record in records if str(record.get("timestamp") or "").startswith(day))
+
+
+def write_incremental_status(
+    path: Path,
+    previous_records: list[dict[str, Any]],
+    current_records: list[dict[str, Any]],
+    new_records: list[dict[str, Any]],
+    baseline_messages_path: Path,
+    delta_messages_path: Path,
+    delta_analysis_dir: Path,
+    *,
+    analysis_skipped: bool,
+) -> None:
+    today_utc = datetime.now(timezone.utc).date().isoformat()
+    status = {
+        "baseline_messages_path": str(baseline_messages_path),
+        "delta_messages_path": str(delta_messages_path),
+        "delta_analysis_dir": str(delta_analysis_dir),
+        "analysis_skipped": analysis_skipped,
+        "needs_refresh": bool(new_records),
+        "baseline_user_messages": len(previous_records),
+        "current_user_messages": len(current_records),
+        "new_user_messages": len(new_records),
+        "today_utc": today_utc,
+        "baseline_messages_today_utc": count_messages_on_utc_day(previous_records, today_utc),
+        "current_messages_today_utc": count_messages_on_utc_day(current_records, today_utc),
+        "new_messages_today_utc": count_messages_on_utc_day(new_records, today_utc),
+        "baseline_date_range": timestamp_range(previous_records),
+        "current_date_range": timestamp_range(current_records),
+        "new_date_range": timestamp_range(new_records),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
+
+
+def clear_incremental_analysis_outputs(delta_dir: Path) -> None:
+    derived_names = {
+        "summary.json",
+        "matched_messages.csv",
+        "spice_messages.csv",
+        "spice_term_counts.csv",
+        "spice_category_counts.csv",
+        "spice_group_counts.csv",
+        "spice_timeline_weekly.csv",
+        "spice_timeline_monthly.csv",
+        "spice-timeline.html",
+        "model_counts.csv",
+        "model_timeline_weekly.csv",
+        "model_timeline_monthly.csv",
+        "category_counts.csv",
+        "signal_counts.csv",
+        "term_counts.csv",
+        "candidate_phrases.csv",
+    }
+    for name in derived_names:
+        path = delta_dir / name
+        if path.exists():
+            path.unlink()
 
 
 if __name__ == "__main__":

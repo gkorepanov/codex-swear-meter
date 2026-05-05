@@ -8,6 +8,7 @@ from codex_log_tone_audit.audit import (
     DEFAULT_SWEAR_LEXICON,
     chart_title,
     compile_patterns,
+    diff_new_records,
     infer_owner_name,
     is_swear_index_hit,
     is_swear_index_group,
@@ -122,6 +123,28 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(chart_title("james"), "James' Codex Swear Meter")
         self.assertEqual(chart_title(""), "Codex Swear Meter")
 
+    def test_diff_new_records_uses_stable_message_identity(self):
+        previous = [
+            {
+                "thread_id": "thread-1",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "message": "already processed",
+            }
+        ]
+        current = [
+            {
+                "thread_id": "thread-1",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "message": "already   processed",
+            },
+            {
+                "thread_id": "thread-1",
+                "timestamp": "2026-01-01T00:00:02Z",
+                "message": "what the hell is this",
+            },
+        ]
+        self.assertEqual(diff_new_records(current, previous), [current[1]])
+
     def test_parse_rollout_excludes_subagents_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             codex_home = Path(tmp)
@@ -204,6 +227,148 @@ class AuditTests(unittest.TestCase):
             self.assertIn("Weekly count and percentage of direct user messages", html)
             self.assertEqual(summary["total_user_messages"], 1)
             self.assertEqual(summary["spice"]["swear_index_messages"], 1)
+
+    def test_incremental_command_writes_delta_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_home = root / ".codex"
+            out_dir = root / "outputs"
+            path = codex_home / "sessions/2026/01/01/rollout-2026-01-01T00-00-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+            path.parent.mkdir(parents=True)
+            lines = [
+                {
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "type": "session_meta",
+                    "payload": {
+                        "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                        "cwd": "/tmp/example",
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "user_message",
+                        "message": "already processed",
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:02Z",
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "user_message",
+                        "message": "what the hell is this",
+                    },
+                },
+            ]
+            path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
+            out_dir.mkdir()
+            (out_dir / "user_messages.jsonl").write_text(
+                json.dumps(
+                    {
+                        "thread_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                        "timestamp": "2026-01-01T00:00:01Z",
+                        "message": "already processed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            main(
+                [
+                    "incremental",
+                    "--codex-home",
+                    str(codex_home),
+                    "--out-dir",
+                    str(out_dir),
+                    "--owner-name",
+                    "alex",
+                ]
+            )
+
+            delta_rows = [
+                json.loads(line)
+                for line in (out_dir / "incremental/new_user_messages.jsonl").read_text(
+                    encoding="utf-8"
+                ).splitlines()
+            ]
+            status = json.loads(
+                (out_dir / "incremental/incremental_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            summary = json.loads(
+                (out_dir / "incremental/summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual([row["message"] for row in delta_rows], ["what the hell is this"])
+            self.assertTrue(status["needs_refresh"])
+            self.assertEqual(status["new_user_messages"], 1)
+            self.assertFalse(status["analysis_skipped"])
+            self.assertEqual(summary["total_user_messages"], 1)
+            self.assertEqual(summary["spice"]["swear_index_messages"], 1)
+
+    def test_incremental_skip_analysis_clears_stale_delta_outputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_home = root / ".codex"
+            out_dir = root / "outputs"
+            path = codex_home / "sessions/2026/01/01/rollout-2026-01-01T00-00-00-dddddddd-dddd-dddd-dddd-dddddddddddd.jsonl"
+            path.parent.mkdir(parents=True)
+            lines = [
+                {
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "type": "session_meta",
+                    "payload": {
+                        "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                        "cwd": "/tmp/example",
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "user_message",
+                        "message": "already processed",
+                    },
+                },
+            ]
+            path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
+            out_dir.mkdir()
+            (out_dir / "user_messages.jsonl").write_text(
+                json.dumps(
+                    {
+                        "thread_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                        "timestamp": "2026-01-01T00:00:01Z",
+                        "message": "already processed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            delta_dir = out_dir / "incremental"
+            delta_dir.mkdir()
+            (delta_dir / "summary.json").write_text('{"stale": true}\n', encoding="utf-8")
+
+            main(
+                [
+                    "incremental",
+                    "--codex-home",
+                    str(codex_home),
+                    "--out-dir",
+                    str(out_dir),
+                    "--skip-analysis",
+                ]
+            )
+
+            status = json.loads(
+                (out_dir / "incremental/incremental_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertTrue(status["analysis_skipped"])
+            self.assertEqual(status["new_user_messages"], 0)
+            self.assertFalse((delta_dir / "summary.json").exists())
 
 
 if __name__ == "__main__":

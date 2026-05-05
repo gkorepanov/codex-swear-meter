@@ -62,9 +62,22 @@ Useful options:
 
 ```bash
 codex-swear-meter audit --codex-home ~/.codex --out-dir outputs --owner-name "Your Name"
+codex-swear-meter incremental --out-dir outputs
 codex-swear-meter analyze --messages outputs/user_messages.jsonl --out-dir outputs
 codex-swear-meter extract --codex-home ~/.codex --out outputs/user_messages.jsonl
 ```
+
+To check whether the chart is stale, run:
+
+```bash
+codex-swear-meter incremental --out-dir outputs
+```
+
+This compares `outputs/user_messages.jsonl` with the current raw Codex logs,
+writes `outputs/incremental/new_user_messages.jsonl`, and analyzes only those
+new messages in `outputs/incremental/`. If the status file says
+`needs_refresh: true`, run `codex-swear-meter audit --out-dir outputs` to rebuild
+the main chart from the fresh corpus.
 
 The chart shows:
 
