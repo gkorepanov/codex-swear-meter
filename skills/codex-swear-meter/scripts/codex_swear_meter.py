@@ -165,7 +165,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       padding: 26px;
       overflow: hidden;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 310px;
+      grid-template-columns: minmax(0, 1fr) 330px;
       column-gap: 24px;
     }
 
@@ -274,7 +274,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
     .model-columns,
     .model-list li {
       display: grid;
-      grid-template-columns: 22px minmax(0, 1fr) 70px 54px;
+      grid-template-columns: 22px minmax(0, 1fr) 66px 66px;
       align-items: center;
       gap: 10px;
     }
@@ -291,6 +291,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 
     .model-columns span {
       text-align: right;
+      white-space: nowrap;
     }
 
     .model-columns span:first-child {

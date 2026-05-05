@@ -337,6 +337,7 @@ class AuditTests(unittest.TestCase):
             self.assertIn('class="chart-logo"', html)
             self.assertIn("data:image/png;base64,", html)
             self.assertIn("model-rate", html)
+            self.assertIn("white-space: nowrap;", html)
             self.assertIn("drawSwearLabels", html)
             self.assertEqual(summary["total_user_messages"], 1)
             self.assertEqual(summary["spice"]["swear_index_messages"], 1)
