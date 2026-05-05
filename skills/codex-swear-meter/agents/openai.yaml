@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Swear Meter"
+  short_description: "Chart Codex frustration signals"
+  default_prompt: "Use $codex-swear-meter to audit my local Codex logs and generate a weekly swear-meter chart."

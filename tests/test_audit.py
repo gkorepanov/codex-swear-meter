@@ -1,0 +1,210 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from codex_log_tone_audit.audit import (
+    DEFAULT_LEXICON,
+    DEFAULT_SWEAR_LEXICON,
+    chart_title,
+    compile_patterns,
+    infer_owner_name,
+    is_swear_index_hit,
+    is_swear_index_group,
+    match_record,
+    model_label,
+    main,
+    parse_rollout,
+    period_date_text,
+    should_skip_message,
+    top_swear_index_examples,
+    week_key,
+)
+
+
+class AuditTests(unittest.TestCase):
+    def test_skip_scaffold_and_automations(self):
+        self.assertTrue(should_skip_message("# AGENTS.md instructions\n..."))
+        self.assertTrue(should_skip_message("Automation: Queue Keeper\n..."))
+        self.assertFalse(
+            should_skip_message("Automation: Queue Keeper\n...", include_automations=True)
+        )
+        self.assertTrue(
+            should_skip_message(
+                "You are processing one item for a generic agent job.\nJob ID: x"
+            )
+        )
+
+    def test_term_boundaries(self):
+        lexicon = {
+            "categories": {
+                "problem_report": {
+                    "weight": 1,
+                    "terms": ["issue", "not working"],
+                }
+            }
+        }
+        patterns = compile_patterns(lexicon)
+        self.assertEqual(match_record("the issue is not working", patterns)[0]["term"], "issue")
+        self.assertFalse(match_record("the tissue sample is fine", patterns))
+
+    def test_spice_pattern_groups(self):
+        lexicon = {
+            "categories": {
+                "hard_swearing": {
+                    "group": "swearing",
+                    "weight": 4,
+                    "terms": ["fuck", "fucking", "what the fuck"],
+                }
+            }
+        }
+        hits = match_record("what the fuck happened", compile_patterns(lexicon))
+        self.assertEqual({hit["group"] for hit in hits}, {"swearing"})
+        self.assertEqual({hit["term"] for hit in hits}, {"fuck", "what the fuck"})
+
+    def test_swear_index_excludes_operational_friction_groups(self):
+        self.assertTrue(is_swear_index_group("swearing"))
+        self.assertTrue(is_swear_index_group("quality_critique"))
+        self.assertFalse(is_swear_index_group("problem_report"))
+        self.assertFalse(is_swear_index_group("incomplete_work"))
+        self.assertFalse(is_swear_index_group("callout"))
+
+    def test_swear_index_excludes_context_only_terms(self):
+        lexicon = {
+            "swear_index_excluded_terms": ["start again"],
+            "categories": {
+                "boundary": {
+                    "group": "boundary_violation",
+                    "weight": 3,
+                    "terms": ["start again", "delete this shit"],
+                }
+            },
+        }
+        hits = match_record("delete this shit and start again", compile_patterns(lexicon))
+        by_term = {hit["term"]: hit for hit in hits}
+        self.assertFalse(is_swear_index_hit(by_term["start again"], lexicon))
+        self.assertTrue(is_swear_index_hit(by_term["delete this shit"], lexicon))
+
+    def test_top_examples_exclude_context_only_terms(self):
+        lexicon = {"swear_index_excluded_terms": ["start again"], "categories": {}}
+        messages = {
+            ("boundary_violation", "boundary", "start again"): 3,
+            ("boundary_violation", "boundary", "delete this shit"): 2,
+            ("callout", "agent_callout", "try again"): 9,
+        }
+        occurrences = {
+            ("boundary_violation", "boundary", "start again"): 4,
+            ("boundary_violation", "boundary", "delete this shit"): 2,
+            ("callout", "agent_callout", "try again"): 9,
+        }
+        examples = top_swear_index_examples(messages, occurrences, lexicon)
+        self.assertEqual([row["term"] for row in examples], ["delete this shit"])
+
+    def test_week_key(self):
+        self.assertEqual(week_key("2026-03-11T17:44:49.123Z"), "2026-W11")
+
+    def test_model_label(self):
+        self.assertEqual(model_label("gpt-5.4", "xhigh"), "gpt-5.4 (xhigh)")
+        self.assertEqual(model_label("gpt-5.4", ""), "gpt-5.4")
+        self.assertEqual(model_label("", "xhigh"), "unknown")
+
+    def test_period_date_text(self):
+        self.assertEqual(period_date_text("2026-W11"), ("Mar 9", "Mar 9-15, 2026"))
+        self.assertEqual(period_date_text("2026-03"), ("Mar 2026", "2026-03"))
+
+    def test_packaged_default_lexicons_exist(self):
+        self.assertTrue(DEFAULT_LEXICON.exists())
+        self.assertTrue(DEFAULT_SWEAR_LEXICON.exists())
+
+    def test_chart_title_personalizes_owner_name(self):
+        self.assertEqual(infer_owner_name("peter"), "Peter")
+        self.assertEqual(chart_title("peter"), "Peter's Codex Swear Meter")
+        self.assertEqual(chart_title("james"), "James' Codex Swear Meter")
+        self.assertEqual(chart_title(""), "Codex Swear Meter")
+
+    def test_parse_rollout_excludes_subagents_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codex_home = Path(tmp)
+            path = codex_home / "sessions/2026/01/01/rollout-2026-01-01T00-00-00-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+            path.parent.mkdir(parents=True)
+            lines = [
+                {
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "type": "session_meta",
+                    "payload": {
+                        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                        "cwd": "/tmp/example",
+                        "source": {"subagent": {"thread_spawn": {"depth": 1}}},
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "type": "event_msg",
+                    "payload": {"type": "user_message", "message": "this is broken"},
+                },
+            ]
+            path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
+            self.assertEqual(
+                parse_rollout(path, codex_home, {}, {}, include_subagents=False, include_automations=False),
+                [],
+            )
+            included = parse_rollout(
+                path,
+                codex_home,
+                {},
+                {},
+                include_subagents=True,
+                include_automations=False,
+            )
+            self.assertEqual(len(included), 1)
+            self.assertTrue(included[0]["is_subagent"])
+
+    def test_audit_command_runs_end_to_end_on_fixture_logs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_home = root / ".codex"
+            out_dir = root / "outputs"
+            path = codex_home / "sessions/2026/01/01/rollout-2026-01-01T00-00-00-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl"
+            path.parent.mkdir(parents=True)
+            lines = [
+                {
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "type": "session_meta",
+                    "payload": {
+                        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                        "cwd": "/tmp/example",
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "user_message",
+                        "message": "what the hell is this, it looks really bad",
+                    },
+                },
+            ]
+            path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
+
+            main(
+                [
+                    "audit",
+                    "--codex-home",
+                    str(codex_home),
+                    "--out-dir",
+                    str(out_dir),
+                    "--owner-name",
+                    "alex",
+                ]
+            )
+
+            html = (out_dir / "spice-timeline.html").read_text(encoding="utf-8")
+            summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertIn("Alex&#x27;s Codex Swear Meter", html)
+            self.assertIn("Weekly count and percentage of direct user messages", html)
+            self.assertEqual(summary["total_user_messages"], 1)
+            self.assertEqual(summary["spice"]["swear_index_messages"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
