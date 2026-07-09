@@ -5,7 +5,8 @@
     "Use these for review leads and for the narrower swear index timeline.",
     "Matches are still review leads. Pasted quotes or long specs can contain these words without being a direct emotional turn.",
     "The swearing group intentionally includes common variants people may use beyond this user's exact phrasing so the audit can be reused.",
-    "swear_index_excluded_terms are still matched for review, but do not count in the visible swear index unless another stronger term also matches the same message."
+    "swear_index_excluded_terms are still matched for review, but do not count in the visible swear index unless another stronger term also matches the same message.",
+    "A trailing * in a term means a Unicode word-stem match for morphology/slang variants."
   ],
   "swear_index_excluded_terms": [
     "a mess",
@@ -19,7 +20,18 @@
     "start again",
     "too wordy",
     "untidy",
-    "why do we need this"
+    "why do we need this",
+    "не трогай",
+    "не удаляй",
+    "не меняй",
+    "переделай",
+    "опять",
+    "тупо",
+    "мусор",
+    "зачем это",
+    "зачем ты",
+    "почему ты",
+    "что происходит"
   ],
   "categories": {
     "hard_swearing": {
@@ -55,7 +67,51 @@
         "dumbass",
         "bastard",
         "bollocks",
-        "fucjing"
+        "fucjing",
+        "бля*",
+        "сука",
+        "сук*",
+        "пиздец",
+        "пизд*",
+        "хуй",
+        "хуе*",
+        "хуё*",
+        "нахуй",
+        "нахер",
+        "ебать",
+        "ёб*",
+        "ебан*",
+        "ёбан*",
+        "ебуч*",
+        "заеб*",
+        "заёб*",
+        "проеб",
+        "проеба*",
+        "проёба*",
+        "уеб*",
+        "уёб*",
+        "наеб*",
+        "наёб*",
+        "насрать",
+        "нихера",
+        "нихрена",
+        "нихуя",
+        "охуел",
+        "охуев*",
+        "ахуел",
+        "ахуев*",
+        "долбоеб*",
+        "долбоёб*",
+        "мудак*",
+        "гандон*",
+        "говно",
+        "говн*",
+        "дерьмо",
+        "жоп*",
+        "пидор*",
+        "пидр*",
+        "шлюх*",
+        "мраз*"
       ]
     },
     "soft_swearing": {
@@ -75,7 +131,21 @@
         "crappy",
         "bloody hell",
         "fucking hell",
-        "what the heck"
+        "what the heck",
+        "блин",
+        "черт",
+        "чёрт",
+        "черт возьми",
+        "чёрт возьми",
+        "еб твою мать",
+        "твою мать",
+        "ёпт",
+        "епт",
+        "капец",
+        "хер",
+        "херня",
+        "фигня",
+        "жесть"
       ]
     },
     "wtf_moment": {
@@ -109,7 +179,23 @@
         "come on man",
         "what is going on here",
         "what happened then",
-        "come on"
+        "come on",
+        "что за хуйня",
+        "что за хуйн*",
+        "что за пиздец",
+        "какого хера",
+        "какого хрена",
+        "какого хуя",
+        "с хуяли",
+        "что блять",
+        "ну охуеть",
+        "охуеть",
+        "нихуя себе",
+        "это что такое",
+        "ну и что это",
+        "что происходит",
+        "что ты делаешь",
+        "ты что делаешь"
       ]
     },
     "confused_challenge": {
@@ -127,7 +213,15 @@
         "why are you doing",
         "why are you comparing",
         "why did you stop",
-        "why do we need this"
+        "why do we need this",
+        "что ты делаешь",
+        "что ты сделал",
+        "что ты наделал",
+        "зачем ты",
+        "почему ты",
+        "что происходит",
+        "что случилось",
+        "зачем это"
       ]
     },
     "agent_callout": {
@@ -160,7 +254,21 @@
         "actually do",
         "try again",
         "redo",
-        "start over"
+        "start over",
+        "ты не сделал",
+        "ты сделал не то",
+        "ты не то сделал",
+        "ты пропустил",
+        "ты проигнорировал",
+        "я просил",
+        "я просила",
+        "я сказал",
+        "я сказала",
+        "не то что я просил",
+        "не то что я просила",
+        "читай промпт",
+        "следуй инструкциям",
+        "делай что попросили"
       ]
     },
     "incomplete_work": {
@@ -201,7 +309,18 @@
         "you are not listening",
         "you are not reading",
         "you are not checking",
-        "you are not following"
+        "you are not following",
+        "не готово",
+        "не сделано",
+        "ты не доделал",
+        "ты не доделала",
+        "недоделано",
+        "доделай",
+        "закончи",
+        "не хватает",
+        "не до конца",
+        "ты не закончил",
+        "ты не закончила"
       ]
     },
     "broken_unusable": {
@@ -224,7 +343,18 @@
         "hard to read",
         "hard to navigate",
         "things are stuck",
-        "doesn't seem to be progressing"
+        "doesn't seem to be progressing",
+        "не работает",
+        "вообще не работает",
+        "сломано",
+        "сломал",
+        "сломала",
+        "ничего не работает",
+        "невозможно использовать",
+        "нельзя использовать",
+        "не видно",
+        "не читается",
+        "не запускается"
       ]
     },
     "trust_break": {
@@ -268,7 +398,21 @@
         "actually run",
         "actually inspect",
         "show me evidence",
-        "prove it"
+        "prove it",
+        "выдумал",
+        "выдумала",
+        "придумал",
+        "придумала",
+        "галлюцинация",
+        "галлюцинируешь",
+        "без проверки",
+        "не проверил",
+        "не проверила",
+        "не запускал",
+        "не запускала",
+        "не читал",
+        "не читала",
+        "притворяешься"
       ]
     },
     "meltdown_language": {
@@ -303,7 +447,18 @@
         "not good enough",
         "low quality",
         "sloppy",
-        "worse than"
+        "worse than",
+        "пиздец",
+        "полный пиздец",
+        "ну охуеть",
+        "охуеть",
+        "капец",
+        "жесть",
+        "сук*",
+        "суук*",
+        "сууук*",
+        "суууук*",
+        "мда уж"
       ]
     },
     "quality_rejection": {
@@ -355,7 +510,32 @@
         "looks quite ugly",
         "looks super ugly",
         "really ugly",
-        "ugly dark colors"
+        "ugly dark colors",
+        "кончен*",
+        "идиот*",
+        "тупой",
+        "тупая",
+        "тупые",
+        "тупо",
+        "дебил*",
+        "кривой",
+        "кривая",
+        "криво",
+        "убог*",
+        "ужасно",
+        "отстой",
+        "хуйня",
+        "хуйн*",
+        "полная хуйня",
+        "полный пиздец",
+        "бред",
+        "бредовый",
+        "позор",
+        "кал",
+        "мусор",
+        "дурь",
+        "гавно",
+        "говно"
       ]
     },
     "unacceptable_boundary": {
@@ -379,7 +559,17 @@
         "start again",
         "kill it and start again",
         "redo from scratch",
-        "do something completely different"
+        "do something completely different",
+        "не удаляй",
+        "не трогай",
+        "не меняй",
+        "зачем удалил",
+        "зачем удалила",
+        "удалил лишнее",
+        "удалила лишнее",
+        "снес",
+        "снесла",
+        "снеси это"
       ]
     },
     "rework_cost": {
@@ -418,7 +608,16 @@
         "even worse now",
         "much worse",
         "even worse",
-        "worse now"
+        "worse now",
+        "переделай",
+        "сделай заново",
+        "начни заново",
+        "опять",
+        "снова то же",
+        "стало хуже",
+        "хуже стало",
+        "сделал хуже",
+        "сделала хуже"
       ]
     },
     "no_shortcuts": {
@@ -437,7 +636,12 @@
         "do it properly",
         "finish it properly",
         "not a mock",
-        "real check"
+        "real check",
+        "не халтурь",
+        "без халтуры",
+        "не притворяйся",
+        "не делай вид",
+        "не надо имитировать"
       ]
     }
   }

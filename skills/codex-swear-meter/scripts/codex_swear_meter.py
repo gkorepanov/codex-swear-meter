@@ -17,11 +17,12 @@ from typing import Any, Iterable
 
 
 UUID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
-TOKEN_RE = re.compile(r"[a-z][a-z0-9']+", re.IGNORECASE)
+TOKEN_RE = re.compile(r"[^\W\d_][\w']*", re.IGNORECASE)
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 DEFAULT_LEXICON = SKILL_DIR / "assets" / "negative_terms.json"
 DEFAULT_SWEAR_LEXICON = SKILL_DIR / "assets" / "swear_index_terms.json"
+DEFAULT_POSITIVE_LEXICON = SKILL_DIR / "assets" / "positive_terms.json"
 DEFAULT_LOGO = SKILL_DIR / "assets" / "codex-swear-meter-logo.png"
 
 SCAFFOLD_PREFIXES = (
@@ -137,6 +138,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       --grid: #dfe5ee;
       --soft-grid: #eef2f7;
       --signal: #ef3340;
+      --positive: #0f9f8f;
       --volume: #2f6fed;
       --border: #d7dee9;
     }
@@ -192,10 +194,10 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 
     h1 {
       margin: 0;
-      font-size: 50px;
-      line-height: 1;
+      font-size: 45px;
+      line-height: 1.03;
       letter-spacing: 0;
-      white-space: nowrap;
+      white-space: normal;
     }
 
     .subtitle {
@@ -204,7 +206,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       color: var(--muted);
       font-size: 16px;
       line-height: 1.35;
-      white-space: nowrap;
+      white-space: normal;
     }
 
     .chart-layout {
@@ -354,12 +356,17 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       border: 1px solid rgba(47, 111, 237, 0.55);
     }
 
-    .line-key {
+    .line-key,
+    .positive-line-key {
       width: 21px;
       height: 4px;
       margin-top: 7px;
       border-radius: 99px;
       background: var(--signal);
+    }
+
+    .positive-line-key {
+      background: var(--positive);
     }
 
     .dot-key {
@@ -512,6 +519,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
             <ul class="key-list">
               <li><i class="bar-key"></i><span><strong>Message volume</strong></span></li>
               <li><i class="line-key"></i><span><strong>Swear index</strong></span></li>
+              <li><i class="positive-line-key"></i><span><strong>Positive index</strong></span></li>
             </ul>
           </div>
 
@@ -544,6 +552,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       grid: css.getPropertyValue("--grid").trim(),
       softGrid: css.getPropertyValue("--soft-grid").trim(),
       signal: css.getPropertyValue("--signal").trim(),
+      positive: css.getPropertyValue("--positive").trim(),
       volume: css.getPropertyValue("--volume").trim(),
       paper: css.getPropertyValue("--paper").trim()
     };
@@ -607,7 +616,10 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
     }
 
     function niceRateMax(data) {
-      const observed = Math.max(0, ...data.map(row => row.swearIndexRate));
+      const observed = Math.max(
+        0,
+        ...data.map(row => Math.max(row.swearIndexRate || 0, row.positiveIndexRate || 0))
+      );
       const padded = Math.max(0.04, observed * 1.25);
       return Math.ceil(padded / 0.02) * 0.02;
     }
@@ -662,9 +674,9 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       }
 
       ctx.font = `800 ${mobile ? 13 : 15}px system-ui, sans-serif`;
-      ctx.fillStyle = colors.signal;
+      ctx.fillStyle = colors.muted;
       ctx.textAlign = "left";
-      ctx.fillText("Swear index", mobile ? 4 : 10, pad.top - 20);
+      ctx.fillText("Index rate", mobile ? 4 : 10, pad.top - 20);
       ctx.fillStyle = colors.volume;
       ctx.textAlign = "right";
       ctx.fillText("Messages", width - (mobile ? 4 : 10), pad.top - 20);
@@ -689,34 +701,18 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
         ctx.strokeRect(x - barW / 2, pad.top + plotH - h, barW, h);
       });
 
-      ctx.strokeStyle = colors.signal;
-      ctx.lineWidth = mobile ? 3 : 4;
-      ctx.beginPath();
-      data.forEach((row, index) => {
-        const x = pad.left + xStep * index;
-        const y = pad.top + plotH - (row.swearIndexRate / maxRate) * plotH;
-        if (index === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-
-      data.forEach((row, index) => {
-        const x = pad.left + xStep * index;
-        const y = pad.top + plotH - (row.swearIndexRate / maxRate) * plotH;
-        ctx.fillStyle = colors.signal;
-        ctx.beginPath();
-        ctx.arc(x, y, mobile ? 3 : 4, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      drawRateLine(ctx, data, { pad, plotH, maxRate, xStep, mobile, field: "positiveIndexRate", color: colors.positive, alpha: 0.90 });
+      drawRateLine(ctx, data, { pad, plotH, maxRate, xStep, mobile, field: "swearIndexRate", color: colors.signal, alpha: 1.0 });
 
       drawSwearLabels(ctx, data, { width, height, pad, plotH, maxRate, xStep, mobile });
 
       ctx.fillStyle = colors.muted;
       ctx.font = `${mobile ? 11 : 13}px system-ui, sans-serif`;
       ctx.textAlign = "center";
+      const mobileTickStep = Math.max(1, Math.ceil(data.length / 4));
       data.forEach((row, index) => {
         const shouldShow = mobile
-          ? index === 0 || index === data.length - 1 || (index % 4 === 0 && index < data.length - 3)
+          ? index === 0 || index === data.length - 1 || (index % mobileTickStep === 0 && index < data.length - 2)
           : index === 0 || index === data.length - 1 || index % 2 === 0;
         if (!shouldShow) return;
         const x = pad.left + xStep * index;
@@ -725,6 +721,31 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
       });
 
       canvas.__chart = { data, pad, plotW, plotH, maxRate, maxTotal, xStep, width, height };
+    }
+
+    function drawRateLine(ctx, data, { pad, plotH, maxRate, xStep, mobile, field, color, alpha }) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = mobile ? 3 : 4;
+      ctx.beginPath();
+      data.forEach((row, index) => {
+        const x = pad.left + xStep * index;
+        const y = pad.top + plotH - ((row[field] || 0) / maxRate) * plotH;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      data.forEach((row, index) => {
+        const x = pad.left + xStep * index;
+        const y = pad.top + plotH - ((row[field] || 0) / maxRate) * plotH;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, mobile ? 3 : 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
     }
 
     function drawSwearLabels(ctx, data, info) {
@@ -814,6 +835,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
           <strong>${escapeHTML(row.dateRange || row.label)}</strong>
           <span>${row.total.toLocaleString()} messages</span>
           <span>${pct(row.swearIndexRate)} swear index (${row.swearIndexMessages} messages)</span>
+          <span>${pct(row.positiveIndexRate || 0)} positive index (${row.positiveIndexMessages || 0} messages)</span>
         `;
         tooltip.style.left = `${clamp(pointX, 120, info.width - 120)}px`;
         tooltip.style.top = `${clamp(pointY, 92, info.height - 96)}px`;
@@ -869,7 +891,7 @@ SPICE_TIMELINE_TEMPLATE = """<!doctype html>
 """
 
 HTML_CHART_START_DATE = date(2025, 12, 29)
-CHART_SUBTITLE = "% of Codex user messages containing swearing, based on local Codex session logs"
+CHART_SUBTITLE = "% of Codex user messages containing swear-index or positive-index terms, based on Codex session logs"
 SWEAR_INDEX_GROUPS = frozenset(
     {
         "swearing",
@@ -945,6 +967,7 @@ def main(argv: list[str] | None = None) -> None:
             records,
             Path(args.lexicon),
             Path(args.spice_lexicon),
+            Path(args.positive_lexicon),
             Path(args.out_dir),
             args.sample_limit,
             args.owner_name,
@@ -964,6 +987,7 @@ def main(argv: list[str] | None = None) -> None:
             records,
             Path(args.lexicon),
             Path(args.spice_lexicon),
+            Path(args.positive_lexicon),
             out_dir,
             args.sample_limit,
             args.owner_name,
@@ -1003,6 +1027,7 @@ def main(argv: list[str] | None = None) -> None:
                 new_records,
                 Path(args.lexicon),
                 Path(args.spice_lexicon),
+                Path(args.positive_lexicon),
                 delta_dir,
                 args.sample_limit,
                 args.owner_name,
@@ -1046,6 +1071,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--messages", required=True)
     analyze.add_argument("--lexicon", default=str(DEFAULT_LEXICON))
     analyze.add_argument("--spice-lexicon", default=str(DEFAULT_SWEAR_LEXICON))
+    analyze.add_argument("--positive-lexicon", default=str(DEFAULT_POSITIVE_LEXICON))
     analyze.add_argument("--out-dir", required=True)
     analyze.add_argument("--sample-limit", type=int, default=75)
     analyze.add_argument(
@@ -1059,6 +1085,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--state", default=None, help="Optional explicit state_5.sqlite path.")
     audit.add_argument("--lexicon", default=str(DEFAULT_LEXICON))
     audit.add_argument("--spice-lexicon", default=str(DEFAULT_SWEAR_LEXICON))
+    audit.add_argument("--positive-lexicon", default=str(DEFAULT_POSITIVE_LEXICON))
     audit.add_argument("--out-dir", default="outputs")
     audit.add_argument("--sample-limit", type=int, default=75)
     audit.add_argument(
@@ -1096,6 +1123,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     incremental.add_argument("--lexicon", default=str(DEFAULT_LEXICON))
     incremental.add_argument("--spice-lexicon", default=str(DEFAULT_SWEAR_LEXICON))
+    incremental.add_argument("--positive-lexicon", default=str(DEFAULT_POSITIVE_LEXICON))
     incremental.add_argument("--sample-limit", type=int, default=75)
     incremental.add_argument(
         "--owner-name",
@@ -1417,6 +1445,7 @@ def analyze_records(
     records: list[dict[str, Any]],
     lexicon_path: Path,
     spice_lexicon_path: Path,
+    positive_lexicon_path: Path,
     out_dir: Path,
     sample_limit: int,
     owner_name: str | None = None,
@@ -1424,11 +1453,14 @@ def analyze_records(
     out_dir.mkdir(parents=True, exist_ok=True)
     lexicon = load_lexicon(lexicon_path)
     spice_lexicon = load_lexicon(spice_lexicon_path)
+    positive_lexicon = load_lexicon(positive_lexicon_path)
     patterns = compile_patterns(lexicon)
     spice_patterns = compile_patterns(spice_lexicon)
+    positive_patterns = compile_patterns(positive_lexicon)
 
     matched_rows: list[dict[str, Any]] = []
     spice_rows: list[dict[str, Any]] = []
+    positive_rows: list[dict[str, Any]] = []
     category_messages: Counter[str] = Counter()
     category_occurrences: Counter[str] = Counter()
     signal_messages: Counter[str] = Counter()
@@ -1439,16 +1471,25 @@ def analyze_records(
     spice_group_occurrences: Counter[str] = Counter()
     spice_term_messages: Counter[tuple[str, str, str]] = Counter()
     spice_term_occurrences: Counter[tuple[str, str, str]] = Counter()
+    positive_category_messages: Counter[str] = Counter()
+    positive_category_occurrences: Counter[str] = Counter()
+    positive_group_messages: Counter[str] = Counter()
+    positive_group_occurrences: Counter[str] = Counter()
+    positive_term_messages: Counter[tuple[str, str, str]] = Counter()
+    positive_term_occurrences: Counter[tuple[str, str, str]] = Counter()
     term_messages: Counter[tuple[str, str]] = Counter()
     term_occurrences: Counter[tuple[str, str]] = Counter()
     month_messages: Counter[str] = Counter()
     month_matched: Counter[str] = Counter()
     monthly_spice: defaultdict[str, Counter[str]] = defaultdict(Counter)
     weekly_spice: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    monthly_positive: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    weekly_positive: defaultdict[str, Counter[str]] = defaultdict(Counter)
     model_messages: Counter[str] = Counter()
     model_spicy: Counter[str] = Counter()
     model_swear: Counter[str] = Counter()
     model_swear_index: Counter[str] = Counter()
+    model_positive: Counter[str] = Counter()
     monthly_models: defaultdict[str, Counter[str]] = defaultdict(Counter)
     weekly_models: defaultdict[str, Counter[str]] = defaultdict(Counter)
     weekly_model_swear_index: defaultdict[str, Counter[str]] = defaultdict(Counter)
@@ -1463,6 +1504,8 @@ def analyze_records(
         month_messages[month] += 1
         monthly_spice[month]["total_messages"] += 1
         weekly_spice[week]["total_messages"] += 1
+        monthly_positive[month]["total_messages"] += 1
+        weekly_positive[week]["total_messages"] += 1
         monthly_models[month][current_model] += 1
         weekly_models[week][current_model] += 1
         model_messages[current_model] += 1
@@ -1488,6 +1531,24 @@ def analyze_records(
                 spice_term_occurrences,
                 monthly_spice[month],
                 weekly_spice[week],
+            )
+
+        positive_hits = match_record(record["message"], positive_patterns)
+        if positive_hits:
+            model_positive[current_model] += 1
+            write_positive_record(
+                record,
+                positive_hits,
+                positive_lexicon,
+                positive_rows,
+                positive_category_messages,
+                positive_category_occurrences,
+                positive_group_messages,
+                positive_group_occurrences,
+                positive_term_messages,
+                positive_term_occurrences,
+                monthly_positive[month],
+                weekly_positive[week],
             )
 
         hits = match_record(record["message"], patterns)
@@ -1529,11 +1590,13 @@ def analyze_records(
 
     matched_rows.sort(key=lambda row: (-int(row["score"]), row.get("timestamp") or ""))
     spice_rows.sort(key=lambda row: (-int(row["spice_score"]), row.get("timestamp") or ""))
+    positive_rows.sort(key=lambda row: (-int(row["positive_score"]), row.get("timestamp") or ""))
     write_summary(
         out_dir / "summary.json",
         records,
         matched_rows,
         spice_rows,
+        positive_rows,
         category_messages,
         category_occurrences,
         signal_messages,
@@ -1544,10 +1607,17 @@ def analyze_records(
         spice_group_occurrences,
         spice_term_messages,
         spice_term_occurrences,
+        positive_category_messages,
+        positive_category_occurrences,
+        positive_group_messages,
+        positive_group_occurrences,
+        positive_term_messages,
+        positive_term_occurrences,
         model_messages,
         model_spicy,
         model_swear,
         model_swear_index,
+        model_positive,
         term_messages,
         term_occurrences,
     )
@@ -1575,12 +1645,32 @@ def analyze_records(
     write_spice_messages(out_dir / "spice_messages.csv", spice_rows)
     write_spice_timeline(out_dir / "spice_timeline_monthly.csv", monthly_spice, "month")
     write_spice_timeline(out_dir / "spice_timeline_weekly.csv", weekly_spice, "week")
+    write_spice_counts(
+        out_dir / "positive_counts.csv",
+        positive_category_messages,
+        positive_category_occurrences,
+        positive_lexicon,
+    )
+    write_spice_group_counts(
+        out_dir / "positive_group_counts.csv",
+        positive_group_messages,
+        positive_group_occurrences,
+    )
+    write_spice_term_counts(
+        out_dir / "positive_term_counts.csv",
+        positive_term_messages,
+        positive_term_occurrences,
+    )
+    write_positive_messages(out_dir / "positive_messages.csv", positive_rows)
+    write_positive_timeline(out_dir / "positive_timeline_monthly.csv", monthly_positive, "month")
+    write_positive_timeline(out_dir / "positive_timeline_weekly.csv", weekly_positive, "week")
     write_model_counts(
         out_dir / "model_counts.csv",
         model_messages,
         model_spicy,
         model_swear,
         model_swear_index,
+        model_positive,
     )
     write_model_timeline(
         out_dir / "model_timeline_monthly.csv",
@@ -1599,6 +1689,7 @@ def analyze_records(
         records,
         monthly_spice,
         weekly_spice,
+        weekly_positive,
         monthly_models,
         weekly_models,
         weekly_model_swear_index,
@@ -1638,12 +1729,13 @@ def compile_patterns(lexicon: dict[str, Any]) -> list[TermPattern]:
 
 
 def term_to_regex(term: str) -> str:
-    escaped = re.escape(term.strip())
+    raw = term.strip()
+    escaped = re.escape(raw).replace(r"\*", r"[\w-]*")
     escaped = re.sub(r"\\\s+", r"\\s+", escaped)
-    if term and term[0].isalnum():
-        escaped = r"(?<![A-Za-z0-9_])" + escaped
-    if term and term[-1].isalnum():
-        escaped = escaped + r"(?![A-Za-z0-9_])"
+    if raw and raw[0].isalnum():
+        escaped = r"(?<![\w])" + escaped
+    if raw and (raw[-1].isalnum() or raw[-1] == "*"):
+        escaped = escaped + r"(?![\w])"
     return escaped
 
 
@@ -1792,6 +1884,67 @@ def write_spice_record(
     )
 
 
+def write_positive_record(
+    record: dict[str, Any],
+    hits: list[dict[str, Any]],
+    positive_lexicon: dict[str, Any],
+    positive_rows: list[dict[str, Any]],
+    category_messages: Counter[str],
+    category_occurrences: Counter[str],
+    group_messages: Counter[str],
+    group_occurrences: Counter[str],
+    term_messages: Counter[tuple[str, str, str]],
+    term_occurrences: Counter[tuple[str, str, str]],
+    month_counts: Counter[str],
+    week_counts: Counter[str],
+) -> None:
+    categories = sorted({hit["category"] for hit in hits})
+    groups = sorted({category_group(category, positive_lexicon) for category in categories})
+    terms = sorted({hit["term"] for hit in hits})
+    occurrences = sum(int(hit["count"]) for hit in hits)
+    positive_score = sum(category_weight(category, positive_lexicon) for category in categories)
+    positive_score += min(4, max(0, occurrences - len(terms)))
+
+    for category in categories:
+        category_messages[category] += 1
+        month_counts[f"category:{category}:messages"] += 1
+        week_counts[f"category:{category}:messages"] += 1
+    for group in groups:
+        group_messages[group] += 1
+        month_counts[f"group:{group}:messages"] += 1
+        week_counts[f"group:{group}:messages"] += 1
+    for hit in hits:
+        category = str(hit["category"])
+        group = category_group(category, positive_lexicon)
+        term = str(hit["term"])
+        count = int(hit["count"])
+        key = (group, category, term)
+        term_messages[key] += 1
+        term_occurrences[key] += count
+        category_occurrences[category] += count
+        group_occurrences[group] += count
+        month_counts[f"category:{category}:occurrences"] += count
+        week_counts[f"category:{category}:occurrences"] += count
+        month_counts[f"group:{group}:occurrences"] += count
+        week_counts[f"group:{group}:occurrences"] += count
+
+    month_counts["positive_messages"] += 1
+    week_counts["positive_messages"] += 1
+    month_counts["positive_occurrences"] += occurrences
+    week_counts["positive_occurrences"] += occurrences
+    positive_rows.append(
+        {
+            **{k: v for k, v in record.items() if k != "message"},
+            "positive_score": positive_score,
+            "positive_groups": ";".join(groups),
+            "positive_categories": ";".join(categories),
+            "positive_terms": ";".join(terms),
+            "positive_occurrences": occurrences,
+            "snippet": make_snippet(record["message"], hits),
+        }
+    )
+
+
 def week_key(timestamp: str) -> str:
     try:
         parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
@@ -1816,6 +1969,7 @@ def write_summary(
     records: list[dict[str, Any]],
     matched_rows: list[dict[str, Any]],
     spice_rows: list[dict[str, Any]],
+    positive_rows: list[dict[str, Any]],
     category_messages: Counter[str],
     category_occurrences: Counter[str],
     signal_messages: Counter[str],
@@ -1826,10 +1980,17 @@ def write_summary(
     spice_group_occurrences: Counter[str],
     spice_term_messages: Counter[tuple[str, str, str]],
     spice_term_occurrences: Counter[tuple[str, str, str]],
+    positive_category_messages: Counter[str],
+    positive_category_occurrences: Counter[str],
+    positive_group_messages: Counter[str],
+    positive_group_occurrences: Counter[str],
+    positive_term_messages: Counter[tuple[str, str, str]],
+    positive_term_occurrences: Counter[tuple[str, str, str]],
     model_messages: Counter[str],
     model_spicy: Counter[str],
     model_swear: Counter[str],
     model_swear_index: Counter[str],
+    model_positive: Counter[str],
     term_messages: Counter[tuple[str, str]],
     term_occurrences: Counter[tuple[str, str]],
 ) -> None:
@@ -1863,6 +2024,25 @@ def write_summary(
                 for (group, category, term), count in spice_term_messages.most_common(50)
             ],
         },
+        "positive": {
+            "positive_user_messages": len(positive_rows),
+            "positive_message_rate": round(len(positive_rows) / total, 6) if total else 0,
+            "positive_index_messages": len(positive_rows),
+            "positive_index_message_rate": round(len(positive_rows) / total, 6) if total else 0,
+            "positive_occurrences": sum(positive_term_occurrences.values()),
+            "top_positive_groups_by_messages": positive_group_messages.most_common(),
+            "top_positive_categories_by_messages": positive_category_messages.most_common(),
+            "top_positive_terms_by_messages": [
+                {
+                    "group": group,
+                    "category": category,
+                    "term": term,
+                    "messages": count,
+                    "occurrences": positive_term_occurrences[(group, category, term)],
+                }
+                for (group, category, term), count in positive_term_messages.most_common(50)
+            ],
+        },
         "model": {
             "top_models_by_user_messages": [
                 {
@@ -1875,6 +2055,10 @@ def write_summary(
                     "swear_index_message_rate": rate(model_swear_index[label], count),
                     "swear_messages": model_swear[label],
                     "swear_message_rate": rate(model_swear[label], count),
+                    "positive_messages": model_positive[label],
+                    "positive_message_rate": rate(model_positive[label], count),
+                    "positive_index_messages": model_positive[label],
+                    "positive_index_message_rate": rate(model_positive[label], count),
                 }
                 for label, count in model_messages.most_common(25)
             ]
@@ -2115,12 +2299,80 @@ def write_spice_timeline(
             writer.writerow(row)
 
 
+def write_positive_timeline(
+    path: Path,
+    period_counts: dict[str, Counter[str]],
+    period_field: str,
+) -> None:
+    category_keys = sorted({
+        key
+        for counts in period_counts.values()
+        for key in counts
+        if key.startswith("category:") and key.endswith(":messages")
+    })
+    group_keys = sorted({
+        key
+        for counts in period_counts.values()
+        for key in counts
+        if key.startswith("group:") and key.endswith(":messages")
+    })
+    dynamic_fields: list[str] = []
+    for key in group_keys:
+        group = key.split(":", 2)[1]
+        dynamic_fields.extend([f"{group}_messages", f"{group}_message_rate"])
+    for key in category_keys:
+        category = key.split(":", 2)[1]
+        dynamic_fields.extend([f"{category}_messages", f"{category}_message_rate"])
+
+    fieldnames = [
+        period_field,
+        "total_messages",
+        "positive_messages",
+        "positive_message_rate",
+        "positive_index_messages",
+        "positive_index_message_rate",
+        "positive_occurrences",
+        "positive_occurrences_per_100_messages",
+        *dict.fromkeys(dynamic_fields),
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for period in sorted(period_counts):
+            counts = period_counts[period]
+            total = counts["total_messages"]
+            row: dict[str, Any] = {
+                period_field: period,
+                "total_messages": total,
+                "positive_messages": counts["positive_messages"],
+                "positive_message_rate": rate(counts["positive_messages"], total),
+                "positive_index_messages": counts["positive_messages"],
+                "positive_index_message_rate": rate(counts["positive_messages"], total),
+                "positive_occurrences": counts["positive_occurrences"],
+                "positive_occurrences_per_100_messages": per_100(
+                    counts["positive_occurrences"], total
+                ),
+            }
+            for key in group_keys:
+                group = key.split(":", 2)[1]
+                value = counts[key]
+                row[f"{group}_messages"] = value
+                row[f"{group}_message_rate"] = rate(value, total)
+            for key in category_keys:
+                category = key.split(":", 2)[1]
+                value = counts[key]
+                row[f"{category}_messages"] = value
+                row[f"{category}_message_rate"] = rate(value, total)
+            writer.writerow(row)
+
+
 def write_model_counts(
     path: Path,
     model_messages: Counter[str],
     model_spicy: Counter[str],
     model_swear: Counter[str],
     model_swear_index: Counter[str],
+    model_positive: Counter[str],
 ) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
@@ -2135,6 +2387,10 @@ def write_model_counts(
                 "swear_index_message_rate",
                 "swear_messages",
                 "swear_message_rate",
+                "positive_messages",
+                "positive_message_rate",
+                "positive_index_messages",
+                "positive_index_message_rate",
             ],
         )
         writer.writeheader()
@@ -2151,6 +2407,10 @@ def write_model_counts(
                     "swear_index_message_rate": rate(model_swear_index[label], count),
                     "swear_messages": model_swear[label],
                     "swear_message_rate": rate(model_swear[label], count),
+                    "positive_messages": model_positive[label],
+                    "positive_message_rate": rate(model_positive[label], count),
+                    "positive_index_messages": model_positive[label],
+                    "positive_index_message_rate": rate(model_positive[label], count),
                 }
             )
 
@@ -2221,6 +2481,7 @@ def write_spice_timeline_html(
     _records: list[dict[str, Any]],
     _monthly_spice: dict[str, Counter[str]],
     weekly_spice: dict[str, Counter[str]],
+    weekly_positive: dict[str, Counter[str]],
     _monthly_models: dict[str, Counter[str]],
     weekly_models: dict[str, Counter[str]],
     weekly_model_swear_index: dict[str, Counter[str]],
@@ -2236,6 +2497,7 @@ def write_spice_timeline_html(
         row
         for row in build_html_period_rows(
             weekly_spice,
+            weekly_positive,
             weekly_models,
             weekly_model_swear_index,
         )
@@ -2281,8 +2543,11 @@ def top_swear_index_examples(
             continue
         if term.casefold() in excluded:
             continue
-        by_term_messages[term] += count
-        by_term_occurrences[term] += occurrences[(group, _category, term)]
+        by_term_messages[term] = max(by_term_messages[term], count)
+        by_term_occurrences[term] = max(
+            by_term_occurrences[term],
+            occurrences[(group, _category, term)],
+        )
     ranked = sorted(
         by_term_messages,
         key=lambda term: (-by_term_messages[term], -by_term_occurrences[term], term),
@@ -2299,12 +2564,14 @@ def top_swear_index_examples(
 
 def build_html_period_rows(
     spice_periods: dict[str, Counter[str]],
+    positive_periods: dict[str, Counter[str]],
     model_periods: dict[str, Counter[str]],
     model_swear_index_periods: dict[str, Counter[str]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for period in sorted(spice_periods):
         spice_counts = spice_periods[period]
+        positive_counts = positive_periods.get(period, Counter())
         total = spice_counts["total_messages"]
         folded_models, folded_model_swear_index = fold_chart_model_counts(
             model_periods.get(period, Counter()),
@@ -2341,6 +2608,11 @@ def build_html_period_rows(
                 "swearMessages": spice_counts["swear_messages"],
                 "swearRate": rate(spice_counts["swear_messages"], total),
                 "swearPer100": per_100(spice_counts["swear_occurrences"], total),
+                "positiveIndexMessages": positive_counts["positive_messages"],
+                "positiveIndexRate": rate(positive_counts["positive_messages"], total),
+                "positiveIndexPer100": per_100(
+                    positive_counts["positive_occurrences"], total
+                ),
                 "calloutRate": rate(spice_counts["group:callout:messages"], total),
                 "emotionRate": rate(spice_counts["group:emotion_spike:messages"], total),
                 "dominantModel": padded[0][0] or "unknown",
@@ -2537,6 +2809,34 @@ def write_spice_messages(path: Path, rows: list[dict[str, Any]]) -> None:
         "swore",
         "swear_index",
         "swear_index_terms",
+        "thread_id",
+        "title",
+        "cwd",
+        "model_label",
+        "model",
+        "reasoning_effort",
+        "source_path",
+        "line_number",
+        "turn_index",
+        "char_count",
+        "word_count",
+        "snippet",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_positive_messages(path: Path, rows: list[dict[str, Any]]) -> None:
+    fieldnames = [
+        "id",
+        "timestamp",
+        "positive_score",
+        "positive_groups",
+        "positive_categories",
+        "positive_terms",
+        "positive_occurrences",
         "thread_id",
         "title",
         "cwd",
@@ -2771,6 +3071,12 @@ def clear_incremental_analysis_outputs(delta_dir: Path) -> None:
         "model_counts.csv",
         "model_timeline_weekly.csv",
         "model_timeline_monthly.csv",
+        "positive_counts.csv",
+        "positive_group_counts.csv",
+        "positive_messages.csv",
+        "positive_term_counts.csv",
+        "positive_timeline_weekly.csv",
+        "positive_timeline_monthly.csv",
         "category_counts.csv",
         "signal_counts.csv",
         "term_counts.csv",

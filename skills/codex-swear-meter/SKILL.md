@@ -1,19 +1,19 @@
 ---
 name: codex-swear-meter
-description: Audit local Codex conversation logs for user frustration, swearing, expletives, swear-adjacent phrases, tone spikes, and model-timeline charts. Use when the user asks to analyze Codex logs/history for swear rate, frustration rate, dissatisfaction signals, negative turns, per-week timeline charts, dominant model color mapping, or a shareable/open-source Codex log tone audit.
+description: Audit local Codex conversation logs for user frustration, swearing, expletives, swear-adjacent phrases, positive satisfaction/courtesy signals, tone spikes, and model-timeline charts. Use when the user asks to analyze Codex logs/history for swear rate, frustration rate, satisfaction rate, gratitude/approval terms, dissatisfaction signals, negative turns, per-week timeline charts, dominant model color mapping, or a shareable/open-source Codex log tone audit.
 ---
 
 # Codex Swear Meter
 
 ## Purpose
 
-Generate a local, privacy-preserving chart of how often direct user messages in Codex logs contain explicit swears or swear-adjacent frustration. Adapt the lexicon to the current user's language instead of assuming one person's habits generalize. The chart title should personalize to the local account name by default, or use `--owner-name` when the user gives a preferred display name.
+Generate a local, privacy-preserving chart of how often direct user messages in Codex logs contain explicit swears or swear-adjacent frustration, plus a visible positive index for gratitude/approval/satisfaction/courtesy signals. Adapt the lexicons to the current user's language instead of assuming one person's habits generalize. The chart title should personalize to the local account name by default, or use `--owner-name` when the user gives a preferred display name.
 
 ## Experience Contract
 
 When a user kicks off this skill, the finished experience should be a personalized version of the same Codex Swear Meter chart:
 
-- same chart structure: title, subtitle, logo, weekly message bars, swear-index line, dominant-model legend, and observed top terms
+- same chart structure: title, subtitle, logo, weekly message bars, swear-index line, positive-index line, dominant-model legend, and observed swear-index top terms
 - personalized title from the local account name or the user's preferred name
 - model colors and counts generated from that user's current Codex metadata
 - top terms generated from that user's current counted matches, not copied from examples
@@ -27,13 +27,14 @@ The bundled lexicons are only a starting point. A serious skill run should inspe
 2. Copy the bundled lexicons before tuning them:
    - `assets/negative_terms.json`
    - `assets/swear_index_terms.json`
+   - `assets/positive_terms.json`
 3. Run the bundled script for a first pass:
 
 ```bash
-python3 ~/.codex/skills/codex-swear-meter/scripts/codex_swear_meter.py audit --codex-home ~/.codex --lexicon <project>/config/negative_terms.json --spice-lexicon <project>/config/swear_index_terms.json --out-dir <project>/outputs
+python3 ~/.codex/skills/codex-swear-meter/scripts/codex_swear_meter.py audit --codex-home ~/.codex --lexicon <project>/config/negative_terms.json --spice-lexicon <project>/config/swear_index_terms.json --positive-lexicon <project>/config/positive_terms.json --out-dir <project>/outputs
 ```
 
-If the user only wants a quick first pass, omit `--lexicon` and `--spice-lexicon`; the script will use the skill defaults.
+If the user only wants a quick first pass, omit `--lexicon`, `--spice-lexicon`, and `--positive-lexicon`; the script will use the skill defaults.
 
 If the local account name is not a good display name, add `--owner-name "Name"` to make the title `Name's Codex Swear Meter`. Pass an empty owner name only when the user wants the generic `Codex Swear Meter` title.
 
@@ -48,14 +49,19 @@ This compares `<project>/outputs/user_messages.jsonl` with the current raw logs,
 5. Inspect the first pass:
    - `outputs/spice_term_counts.csv`: actual counted terms
    - `outputs/spice_messages.csv`: matched snippets for review
+   - `outputs/positive_term_counts.csv`: actual positive gratitude/approval terms
+   - `outputs/positive_messages.csv`: matched positive snippets for review
    - `outputs/candidate_phrases.csv`: phrase candidates from the user's own messages
    - `outputs/model_timeline_weekly.csv`: dominant model by week
-6. Tune the copied swear-index lexicon to the user:
+6. Tune the copied swear-index and positive lexicons to the user:
    - Add phrase-level terms that clearly express their own frustration style.
    - Keep literal swears and swear-adjacent phrases in the chart metric.
    - Avoid broad technical words such as `bug`, `issue`, `problem`, `error`, `wrong`, or `failed` unless paired with a stronger emotional phrase.
    - Prefer narrow phrases such as `what the hell`, `this is awful`, `this sucks`, `come on`, `wasting my time`, `this is a mess`, or `made it worse` over generic single-word negativity.
    - Treat reset/operation phrases such as `start again`, `delete this`, `redo`, and `try again` as review leads, not chart-metric terms, unless the same message also contains a stronger frustration phrase.
+   - Keep positive courtesy (`please`, `пожалуйста`) separate from stronger approval (`круто`, `отлично`, `заебись`, `все работает`) when summarizing satisfaction.
+   - Avoid broad positive words such as bare `работает`, `именно`, `right`, `fixed`, `done`, or `правильно` when they often appear in neutral instructions, quoted specs, or negative phrases like `не работает`; prefer phrase-level positive terms such as `все работает`, `спасибо, работает`, `работает супер`, `круто`, or `отлично`.
+   - A trailing `*` in a term is a Unicode word-stem match, useful for Russian morphology such as `бля*`, `кончен*`, or `охуен*`.
 7. Re-run the audit after tuning and use that rerun for the final chart.
 8. Open `outputs/spice-timeline.html` and visually verify desktop and mobile:
    - no label overlap
@@ -63,7 +69,8 @@ This compares `<project>/outputs/user_messages.jsonl` with the current raw logs,
    - title/subtitle fit
    - dominant-model legend maps colors to names and total message counts
    - top terms are data-backed from the user's own counted terms
-9. Final response should include the HTML path, the total direct-user-message count, the swear-index count and percentage, the latest included timestamp, and what was tuned. Do not expose raw snippets unless the user asks.
+   - positive-index line renders and the mobile x-axis labels do not overlap
+9. Final response should include the HTML path, the total direct-user-message count, the swear-index count and percentage, the positive count and percentage, the latest included timestamp, and what was tuned. Do not expose raw snippets unless the user asks.
 
 ## Corpus Reading And Subagents
 
@@ -95,6 +102,8 @@ The coordinator should merge only terms with current-corpus evidence and should 
   unrecognized or private model labels into `Other`; do not expose internal
   model codenames in screenshots, README examples, or generated HTML.
 - Keep broader dissatisfaction outputs in CSVs for review, but do not quietly mix them into the visible swear meter.
+- The visible chart should include a separate positive-index line. Use `positive_index_message_rate`, currently equivalent to positive matched messages divided by all direct user messages. Keep it visually and semantically separate from the swear-index line.
+- Keep positive satisfaction/courtesy outputs in separate positive CSVs; do not mix them into the visible swear meter line.
 - Use `swear_index_excluded_terms` in the spice lexicon for ambiguous terms that should still appear in review outputs but should not count in the chart by themselves.
 - If the dominant model list has `unknown`, explain that the session logs were readable but `state_5.sqlite` lacked model metadata for those threads.
 - Do not publish raw logs, message snippets, or CSVs unless the user explicitly asks. Screenshots may still reveal private usage patterns; ask before sharing.

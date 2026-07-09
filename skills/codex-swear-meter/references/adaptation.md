@@ -9,6 +9,7 @@ Build a user-specific swear meter from that user's own Codex logs. Do not copy a
 Count a message when it contains at least one explicit swear or a narrow swear-adjacent frustration phrase. Good chart-metric families:
 
 - direct profanity: `fuck`, `fucking`, `shit`, `bullshit`, `wtf`, `ffs`
+- Russian profanity/stems: `бля*`, `заеб*`, `пиздец`, `кончен*`, `идиот*`, `тупой`
 - softened expletives: `what the hell`, `for god's sake`, `damn`, `crap`
 - hot challenge phrases: `come on`, `are you kidding me`, `what are you doing`
 - clear output rejection: `this is awful`, `not good enough`, `this is ridiculous`
@@ -16,6 +17,29 @@ Count a message when it contains at least one explicit swear or a narrow swear-a
 - escalation/boundary phrases: `unacceptable`, `delete this shit`, `kill it and start again`
 
 Keep normal debugging terms out of the swear index. `bug`, `issue`, `problem`, `error`, `failed`, `wrong`, and `broken` are too broad for the visible chart unless the surrounding phrase is clearly emotional.
+
+The lexicon supports a trailing `*` as a Unicode word-stem match. Use it for
+Russian morphology and slang variants, for example `бля*`, `кончен*`,
+`заеб*`, or `охуен*`. Prefer the shortest stem that stays precise; do not add a
+stem if it catches ordinary words.
+
+## Positive Analytics
+
+Positive analytics are separate from the visible swear chart. Count direct
+gratitude, politeness, approval, and satisfaction markers, such as `thanks`,
+`please`, `спасибо`, `пожалуйста`, `круто`, `отлично`, `заебись`,
+`все работает`, `работает супер`, or `то что надо`.
+
+Treat `please` and `пожалуйста` as courtesy, not proof of satisfaction. When
+summarizing whether the user was happy, distinguish stronger approval/satisfaction
+from polite request markers.
+
+The shareable chart should show positive analytics as a separate positive-index
+line, not as part of the swear-index line. The positive index is the share of
+direct user messages with at least one positive lexicon hit. Avoid broad bare
+terms such as `работает`, `именно`, `right`, `fixed`, `done`, or `правильно`
+when they mostly match neutral instructions, quotes, or negative phrases like
+`не работает`; prefer phrase-level positive terms with clear approval context.
 
 ## Ambiguous Term Adjudication
 
@@ -36,10 +60,12 @@ Keep a short tuning ledger when preparing a reusable artifact: term, action, mat
 
 1. Run the default audit.
 2. Read the top counted terms and 20-50 matched snippets.
-3. Read candidate phrases for compact, repeated user wording.
-4. Add only high-precision phrase terms to the copied lexicon.
-5. Remove or narrow terms that mostly match neutral work requests, pasted logs, benchmark labels, or quoted instructions.
-6. Re-run and compare top terms before trusting the chart.
+3. Read `positive_term_counts.csv` and `positive_messages.csv` for gratitude,
+   courtesy, approval, and satisfaction matches.
+4. Read candidate phrases for compact, repeated user wording.
+5. Add only high-precision phrase terms to the copied lexicons.
+6. Remove or narrow terms that mostly match neutral work requests, pasted logs, benchmark labels, or quoted instructions.
+7. Re-run and compare top terms before trusting the chart.
 
 The goal is semantic adaptation, not copying a global swear list. For a new user, look for their own ways of expressing anger, disappointment, disbelief, impatience, or sharp rejection. A phrase can be countable even if it is not literal profanity, but it should be narrow enough that it rarely appears in ordinary debugging or planning.
 
@@ -76,6 +102,8 @@ Each reader should return evidence summaries, not raw private snippets: candidat
   questions recent model counts, audit `source_path`, `title`, `source_kind`,
   `is_subagent`, and `model_label` for the disputed date range before changing
   the calculation.
+- Positive-index line should use `positive_index_message_rate`: positive matched
+  direct user messages divided by all direct user messages in that week.
 - In shareable outputs, name only public GPT model families. Fold unrecognized
   or private model labels into `Other` so internal codenames never appear in
   screenshots, README examples, or generated HTML.
